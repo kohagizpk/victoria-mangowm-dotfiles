@@ -1,59 +1,64 @@
 // -*- mode: jsonc -*-
 {
-    "layer": "top", 
-    "position": "top", 
-    "height": 20,
+    "layer": "top",
+    "position": "top",
+    "height": 28,
     "spacing": 0,
 
-    // Choose the order of the modules
     "modules-left": [
         "dwl/tags",
-	"custom/sep",
-	"pulseaudio#mic",
-	"custom/sep",
-	"pulseaudio#audio",
-	"custom/sep",
-    "disk"
-    ],
-    "modules-center": [
-	"tray"
+        "custom/sep",
+        "pulseaudio#mic",
+        "pulseaudio#audio",
+        "custom/sep",
+        "disk",
+        "cpu",
+        "memory"
     ],
     "modules-right": [
         "network",
         "battery",
         "custom/sep",
-        "cpu",
-        "custom/sep",
-        "memory",
-        "clock"
+        "dwl/window",
+        "clock",
+        "custom/power"
     ],
 
-    // Modules configuration
+    "dwl/tags": {
+    "num-tags": 9,
+    "tag-labels": ["1", "2", "3", "4", "5", "6", "7", "8", "9"]
+    },
+
     "tray": {
-        // "icon-size": 21,
         "spacing": 10
-        // "icons": {
-        //   "blueman": "bluetooth",
-        //   "TelegramDesktop": "$HOME/.local/share/icons/hicolor/16x16/apps/telegram.png"
-        // }
     },
+
     "clock": {
-	"format": "{:%H:%M:%S}",
-        "format-alt": "{:%d-%m-%Y}",
-	"interval": 1
-    },
-    "cpu": {
-        "format": "CPU: {usage}%",
+        "format": "󰥔 {:%H:%M:%S}",
+        "format-alt": "󰃭 {:%d/%m/%Y}",
+        "interval": 1,
         "tooltip": false
     },
-    "memory": {
-        "format": "RAM: {used}GB"
+
+    "cpu": {
+        "format": "󰍛 {usage}%",
+        "tooltip": false,
+        "interval": 2
     },
+
+    "memory": {
+        "format": "󰾅 {used:.1f}GB",
+        "tooltip": false,
+        "interval": 5
+    },
+
     "disk": {
         "interval": 60,
         "path": "/",
-        "format": "Disk: {free}"
+        "format": "󰋊 {percentage_used}%",
+        "tooltip-format": "{used} usados de {total}"
     },
+
     "battery": {
         "states": {
             "good": 95,
@@ -61,55 +66,62 @@
             "critical": 15
         },
         "format": "{icon} {capacity}%",
-        "format-plugged": "{capacity}% ",
+        "format-plugged": "󰂄 {capacity}%",
         "format-alt": "{icon} {time}",
-        "format-time": "{H}:{M}",
-        "format-icons": ["", "", "", "", ""]
+        "format-time": "{H}h{M}m",
+        "format-icons": ["󰁺", "󰁻", "󰁼", "󰁽", "󰁾", "󰁿", "󰂀", "󰂁", "󰂂", "󰁹"]
     },
+
     "network": {
-        "format": "On 󱘖",
-        "format-disconnected": "Off ⚠"
+        "format-wifi": "󰤨 {essid}",
+        "format-ethernet": "󰈀 {ifname}",
+        "format-disconnected": "󰤭 Offline",
+        "tooltip-format": "{ipaddr} — {bandwidthUpBits} ↑ {bandwidthDownBits} ↓",
+        "interval": 5
     },
-        "temperature": {
-        "format": "{icon} {temperatureC}°C",
-        "format-icons": ["", "", ""]
-    },
-    "backlight": {
-        // "device": "acpi_video1",
-        "format": "{icon} {percent}%",
-        "format-icons": ["󰖔", "󰖨"]
-    },
-        "pulseaudio#audio": {
+
+    "pulseaudio#audio": {
         "format": "{icon} {volume}%",
         "tooltip": false,
-        "format-muted": " Muted",
+        "format-muted": "󰝟 Mudo",
         "on-click": "wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle",
-        "on-scroll-up": "wpctl set-volume -l 1.5 @DEFAULT_AUDIO_SINK@ 2%+",
-        "on-scroll-down": "wpctl set-volume -l 1.5 @DEFAULT_AUDIO_SINK@ 2%-",
-        "scroll-step": 5,
+        "on-scroll-up": "wpctl set-volume -l 1.0 @DEFAULT_AUDIO_SINK@ 2%+",
+        "on-scroll-down": "wpctl set-volume -l 1.0 @DEFAULT_AUDIO_SINK@ 2%-",
+        "on-click-right": "pavucontrol",
         "format-icons": {
-            "headphone": "",
-            "hands-free": "",
-            "headset": "",
-            "phone": "",
-            "portable": "",
-            "car": "",
-            "default": ["", "", ""]
-	}
+            "headphone": "󰋋",
+            "headset": "󰋎",
+            "default": ["󰕿", "󰖀", "󰕾"]
+        }
     },
-    "custom/power": {
-        "format": "",
-        "tooltip": false,
-        "on-click": "wlogout"
+
+    "pulseaudio#mic": {
+        "format": "{format_source}",
+        "format-source": "󰍬 On",
+        "format-source-muted": "󰍭 Off",
+        "on-click": "wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle",
+        "tooltip": false
     },
-   "pulseaudio#mic": {
-    "format": "{format_source}",
-    "format-source": " On",
-    "format-source-muted": " Off",
-    "on-click": "wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle"
-      },
+
     "custom/sep": {
-        "format" : "|",
-        "interval" : 0
-    }
+        "format": "",
+        "interval": 0,
+        "tooltip": false
+    },
+    
+    "dwl/window": {
+    "format": "{}",
+    "rewrite": {
+        "": "Desktop"
+    },
+    
+    "custom/power": {
+    "format": "⏻",
+    "tooltip": false,
+    "on-click": "wlogout",
+    "on-click-right": "systemctl poweroff",
+    "on-click-middle": "systemctl reboot"
+}
+}
+
 }

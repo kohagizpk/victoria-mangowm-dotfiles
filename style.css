@@ -276,3 +276,50 @@ tooltip {
 }
 #swaync{
     color: #ffd700;}
+
+    /* Tags DWL/MangoWM */
+/* Tags DWL/MangoWM */
+#tags button {
+    padding: 0 7px;
+    color: #444459;
+    background: transparent;
+    border-radius: 8px;
+    font-size: 95%;
+    min-width: 22px;
+    transition: all 0.2s ease;
+}
+
+#tags button.active {
+    color: #ffffff;
+    background-color: #cba6f7;
+    border-radius: 10px;
+    padding: 0 10px;
+    font-weight: bold;
+}
+
+#tags button.occupied:not(.active) {
+    color: #cba6f7;
+    border-bottom: 2px solid #cba6f7;
+}
+
+#tags button.urgent {
+    color: #f38ba8;
+    background-color: rgba(243, 56, 56, 0.2);
+    border-radius: 8px;
+    animation-name: blink;
+    animation-duration: 1s;
+    animation-iteration-count: infinite;
+    animation-direction: alternate;
+}
+
+#tags button:hover {
+    color: #ffd700;
+    background-color: rgba(255, 215, 0, 0.15);
+    border-radius: 8px;
+}
+
+#custom-sep {
+    color: #444459;
+    padding: 0 2px;
+    font-size: 90%;
+}
