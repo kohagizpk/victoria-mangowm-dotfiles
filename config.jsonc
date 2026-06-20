@@ -11,8 +11,6 @@
 	"custom/sep",
 	"pulseaudio#mic",
 	"custom/sep",
-	"backlight",
-	"custom/sep",
 	"pulseaudio#audio",
 	"custom/sep",
     "disk"
@@ -21,15 +19,12 @@
 	"tray"
     ],
     "modules-right": [
-	"custom/sep",
         "network",
-        "custom/sep",
         "battery",
         "custom/sep",
         "cpu",
         "custom/sep",
         "memory",
-        "custom/sep",
         "clock"
     ],
 
