@@ -11,13 +11,15 @@
         "pulseaudio#mic",
         "pulseaudio#audio",
         "custom/sep",
-        "disk",
         "cpu",
         "memory"
     ],
+    "modules-center": [
+        "tray"
+    ],
     "modules-right": [
         "network",
-        "battery",
+        "disk",
         "custom/sep",
         "dwl/window",
         "clock",
@@ -28,8 +30,9 @@
     "num-tags": 9,
     "tag-labels": ["1", "2", "3", "4", "5", "6", "7", "8", "9"]
     },
-
+    
     "tray": {
+        "icon-size":17,
         "spacing": 10
     },
 
@@ -123,5 +126,4 @@
     "on-click-middle": "systemctl reboot"
 }
 }
-
 }
