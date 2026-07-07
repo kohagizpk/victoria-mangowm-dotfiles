@@ -19,7 +19,7 @@
     ],
     "modules-right": [
         "network",
-        "disk",
+        "temperature",
         "custom/sep",
         "dwl/window",
         "clock",
@@ -32,7 +32,6 @@
     },
     
     "tray": {
-        "icon-size":17,
         "spacing": 10
     },
 
@@ -55,11 +54,13 @@
         "interval": 5
     },
 
-    "disk": {
-        "interval": 60,
-        "path": "/",
-        "format": "󰋊 {percentage_used}%",
-        "tooltip-format": "{used} usados de {total}"
+    "temperature": {
+        "hwmon-path": "/sys/class/hwmon/hwmon4/temp1_input",
+        "interval": 5,
+        "critical-threshold": 80,
+        "format": "{icon} {temperatureC}°C",
+        "format-icons": ["", "", ""],
+        "tooltip": false
     },
 
     "battery": {
@@ -113,17 +114,17 @@
     },
     
     "dwl/window": {
-    "format": "{}",
-    "rewrite": {
-        "": "Desktop"
+        "format": "{}",
+        "rewrite": {
+            "": "Desktop"
+        }
     },
-    
+
     "custom/power": {
-    "format": "⏻",
-    "tooltip": false,
-    "on-click": "wlogout",
-    "on-click-right": "systemctl poweroff",
-    "on-click-middle": "systemctl reboot"
-}
-}
+        "format": "⏻",
+        "tooltip": false,
+        "on-click": "wlogout",
+        "on-click-right": "systemctl poweroff",
+        "on-click-middle": "systemctl reboot"
+    }
 }

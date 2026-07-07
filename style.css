@@ -120,7 +120,7 @@ tooltip {
 #bluetooth,
 #clock,
 #cpu,
-#disk,
+#temperature,
 #idle_inhibitor,
 #keyboard-state,
 #memory,
@@ -225,6 +225,10 @@ tooltip {
 }
 
 #cpu {
+	color: @mauve;
+}
+
+#temperature {
 	color: @mauve;
 }
 
