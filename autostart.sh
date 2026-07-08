@@ -10,7 +10,9 @@ export XDG_SESSION_TYPE=wayland
 dbus-update-activation-environment \
     WAYLAND_DISPLAY \
     XDG_CURRENT_DESKTOP \
-    XDG_SESSION_TYPE
+    XDG_SESSION_TYPE \
+    XCURSOR_THEME \
+    XCURSOR_SIZE
 
 sleep 0.5
 
