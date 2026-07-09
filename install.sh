@@ -92,6 +92,17 @@ if ! confirm "Começar?"; then
     exit 0
 fi
 
+# ---------- systemd-libs dummy (Artix) ----------
+# pacotes do AUR (feitos pra Arch puro) costumam depender de systemd/systemd-libs.
+# No Artix com libelogind isso dá conflito de arquivo; a correção oficial é instalar
+# o artix-archlinux-support, que fornece um systemd/systemd-libs "dummy".
+if [[ "$INIT_SYSTEM" != "systemd" ]] && pacman -Si artix-archlinux-support >/dev/null 2>&1; then
+    step "systemd-libs dummy (Artix)"
+    sudo pacman -S --needed --noconfirm artix-archlinux-support
+    ok "artix-archlinux-support instalado"
+    log_adapt "artix-archlinux-support instalado antes do resto -> evita conflito libelogind x systemd-libs em pacotes do AUR (mango, discord, etc. são feitos pra Arch puro)"
+fi
+
 # ---------- AUR helper ----------
 if command -v yay >/dev/null 2>&1; then
     AUR_HELPER="yay"
