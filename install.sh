@@ -217,10 +217,13 @@ PACKAGES=(
     jq
 )
 
-# seat management: mango (via libseat) needs elogind outside of systemd
+# seat management: mango (via libseat) needs elogind outside of systemd.
+# ly is the display manager on every init system; each one needs its own
+# integration package.
 case "$INIT_SYSTEM" in
-    openrc) PACKAGES+=(elogind-openrc) ;;
-    dinit)  PACKAGES+=(elogind-dinit) ;;
+    openrc)  PACKAGES+=(elogind-openrc ly ly-openrc) ;;
+    dinit)   PACKAGES+=(elogind-dinit ly ly-dinit) ;;
+    systemd) PACKAGES+=(ly) ;;
 esac
 
 step "Packages (${#PACKAGES[@]})"
@@ -249,6 +252,100 @@ if [[ "$INIT_SYSTEM" != "systemd" ]]; then
     ok "elogind configured (if it was already active, the commands above just confirmed that)"
 fi
 
+# ---------- display manager (ly) ----------
+step "Display manager (ly)"
+
+# Create a Wayland session entry so ly (or any other display manager) can
+# list Mango, in case the mangowm-git package doesn't ship one.
+if [[ ! -f /usr/share/wayland-sessions/mango.desktop ]]; then
+    sudo mkdir -p /usr/share/wayland-sessions
+    sudo tee /usr/share/wayland-sessions/mango.desktop >/dev/null <<'LYEOF'
+[Desktop Entry]
+Name=Mango
+Comment=MangoWM, a dwl-based Wayland compositor
+Exec=mango
+Type=Application
+LYEOF
+    log_adapt "Created /usr/share/wayland-sessions/mango.desktop so display managers can list Mango as a session"
+fi
+
+case "$INIT_SYSTEM" in
+    systemd)
+        enable_ly=1
+        other_dm=""
+        for dm in gdm sddm lightdm lxdm; do
+            if systemctl is-enabled "${dm}.service" >/dev/null 2>&1; then
+                other_dm="$dm"
+                break
+            fi
+        done
+
+        if [[ -n "$other_dm" ]]; then
+            warn "${other_dm}.service is already enabled as your display manager."
+            if confirm "Disable ${other_dm} and switch to ly?"; then
+                sudo systemctl disable "${other_dm}.service" || true
+            else
+                enable_ly=0
+                warn "Leaving ${other_dm} in place; not enabling ly."
+            fi
+        fi
+
+        if [[ "$enable_ly" -eq 1 ]]; then
+            sudo systemctl enable ly.service
+            ok "ly enabled as the display manager"
+            log_adapt "Installed and enabled ly.service as the display manager — Mango now shows up as a selectable session on the login screen"
+        fi
+        ;;
+
+    dinit)
+        # Known ly-dinit packaging issue on Artix: its service file uses
+        # shares-console instead of pinning ly to its own tty, so it fights
+        # the getty on the console dinit itself uses (whatever tty PID 1's
+        # stdout points to — tty1 unless the kernel cmdline says otherwise)
+        # for control of the VT and crashes in a restart loop ("panic:
+        # reached unreachable code"). Fix: free that tty from ACTIVE_CONSOLES.
+        CONSOLE_CONF=/etc/dinit.d/config/console.conf
+        if [[ -f "$CONSOLE_CONF" ]] && grep -q '^ACTIVE_CONSOLES=' "$CONSOLE_CONF"; then
+            dinit_console="$(readlink -f /proc/1/fd/1 2>/dev/null || echo /dev/tty1)"
+            if [[ "$dinit_console" != /dev/tty* ]]; then
+                cmdline_tty="$(grep -oE 'console=tty[0-9]+' /proc/cmdline 2>/dev/null | head -1 | grep -oE '[0-9]+')"
+                dinit_console="/dev/tty${cmdline_tty:-1}"
+            fi
+            dinit_tty_num="${dinit_console##*tty}"
+
+            consoles=()
+            for n in 1 2 3 4 5 6; do
+                [[ "$n" == "$dinit_tty_num" ]] && continue
+                consoles+=("/dev/tty${n}")
+            done
+            new_active="${consoles[*]}"
+
+            sudo sed -i "s|^ACTIVE_CONSOLES=.*|ACTIVE_CONSOLES=\"${new_active}\"|" "$CONSOLE_CONF"
+            ok "Freed ${dinit_console} (dinit's own console) from ACTIVE_CONSOLES so ly can use it without fighting a getty"
+            log_adapt "dinit: removed ${dinit_console} from $CONSOLE_CONF's ACTIVE_CONSOLES — without this, ly crash-loops with 'panic: reached unreachable code' because it and the getty on that tty fight over VT control. Requires a reboot to take effect."
+            REBOOT_NEEDED_FOR_LY=1
+        else
+            warn "$CONSOLE_CONF not found or not in the expected format — skipping the console fix, check it by hand if ly crash-loops."
+        fi
+
+        sudo dinitctl enable ly || true
+        if [[ "${REBOOT_NEEDED_FOR_LY:-0}" -eq 1 ]]; then
+            ok "ly enabled (will start after your next reboot, needed for the console change above to take effect)"
+        else
+            sudo dinitctl start ly || true
+            ok "ly enabled and started"
+        fi
+        log_adapt "Installed ly + ly-dinit and enabled it as the display manager"
+        ;;
+
+    openrc)
+        sudo rc-update add ly default || true
+        ok "ly enabled as the display manager (OpenRC)"
+        log_adapt "Installed ly + ly-openrc and enabled it as the display manager"
+        info "If ly crash-loops with a VT/console error, it's likely the same kind of getty-vs-ly console conflict as on dinit — check what's running on the tty ly wants (usually tty2) with 'rc-status' and free it up in your getty config."
+        ;;
+esac
+
 # ---------- copy dotfiles (only if we're not already operating in place) ----------
 if [[ "$IN_PLACE" -eq 1 ]]; then
     step "Using $CONFIG_DIR in place"
@@ -276,7 +373,7 @@ step "Applying corrections"
 
 WAYBAR_JSONC="$CONFIG_DIR/waybar/config.jsonc"
 AUTOSTART="$CONFIG_DIR/scripts/autostart.sh"
-WLOGOUT_LAYOUT="$CONFIG_DIR/kohagi_personal_configs/wlogout/layout"
+WLOGOUT_LAYOUT="$CONFIG_DIR/config/wlogout/layout"
 WLOGOUT_THEME_SCRIPT="$CONFIG_DIR/scripts/wlogout-theme.sh"
 
 # 1) waybar: systemctl -> loginctl (no systemd, running elogind)
@@ -295,7 +392,7 @@ if [[ -f "$WLOGOUT_LAYOUT" ]]; then
         -e 's/"action" : "hyprlock"/"action" : "swaylock -f"/' \
         -e 's/"action" : "hyprctl dispatch exit"/"action" : "mmsg dispatch quit"/' \
         "$WLOGOUT_LAYOUT"
-    log_adapt "kohagi_personal_configs/wlogout/layout: hyprlock -> swaylock -f, hyprctl dispatch exit -> mmsg dispatch quit (those were Hyprland commands, not mango's; mmsg syntax updated for >= 0.14.0)"
+    log_adapt "config/wlogout/layout: hyprlock -> swaylock -f, hyprctl dispatch exit -> mmsg dispatch quit (those were Hyprland commands, not mango's; mmsg syntax updated for >= 0.14.0)"
 fi
 
 # 3) wlogout-theme.sh: BASE/TARGET used a quoted "~", which bash does NOT expand
@@ -303,9 +400,9 @@ fi
 #    "~/..." path that doesn't exist. Use $HOME instead, which does expand.
 if [[ -f "$WLOGOUT_THEME_SCRIPT" ]]; then
     sed -i \
-        -e 's#BASE="~/\.config/mango/kohagi_personal_configs/wlogout"#BASE="$HOME/.config/mango/kohagi_personal_configs/wlogout"#' \
+        -e 's#BASE="~/\.config/mango/config/wlogout"#BASE="$HOME/.config/mango/config/wlogout"#' \
         -e 's#TARGET="~/\.config/wlogout"#TARGET="$HOME/.config/wlogout"#' \
-        -e 's#BASE="/home/julia/\.config/mango/kohagi_personal_configs/wlogout"#BASE="$HOME/.config/mango/kohagi_personal_configs/wlogout"#' \
+        -e 's#BASE="/home/julia/\.config/mango/config/wlogout"#BASE="$HOME/.config/mango/config/wlogout"#' \
         -e 's#TARGET="/home/julia/\.config/wlogout"#TARGET="$HOME/.config/wlogout"#' \
         "$WLOGOUT_THEME_SCRIPT"
     log_adapt "scripts/wlogout-theme.sh: BASE/TARGET now use \$HOME instead of a hardcoded /home/julia path or a quoted ~ (which bash never expands inside quotes)"
@@ -339,7 +436,7 @@ POLKITEOF
 if [ -f "$HOME/.config/waypaper/config.ini" ]; then\
     waypaper --restore \&\
 else\
-    swaybg -i "'"${CONFIG_DIR}"'/kohagi_personal_configs/wallpaper/wallpaper.png" \&\
+    swaybg -i "'"${CONFIG_DIR}"'/config/wallpaper/wallpaper.png" \&\
 fi' "$AUTOSTART"
         log_adapt "scripts/autostart.sh: waypaper --restore does nothing on a fresh install (no saved state yet) -> falls back to swaybg with the bundled wallpaper so you get one immediately"
     fi
@@ -416,6 +513,28 @@ if [[ -f "$CONFIG_DIR/config.conf" ]] && grep -qx '=id:1,layout_name:scroller' "
     log_adapt "config.conf: commented out the line '=id:1,layout_name:scroller' (missing the 'tagrule=' prefix, had no effect and could confuse the parser). If you actually wanted tag 1 on the scroller layout instead of tile, let me know and I'll fix it properly."
 fi
 
+# 8) config.conf: the SUPER+A keybind launches plain "discord", without the
+#    Wayland/PipeWire flags that autostart.sh already uses. Screen sharing
+#    only works with those flags, so any Discord window opened via this bind
+#    (instead of the one autostart launched) would have broken screen share.
+if [[ -f "$CONFIG_DIR/config.conf" ]] && grep -qx 'bind=SUPER,a,spawn,discord' "$CONFIG_DIR/config.conf"; then
+    sed -i 's/^bind=SUPER,a,spawn,discord$/bind=SUPER,a,spawn,discord --enable-features=UseOzonePlatform,WebRTCPipeWireCapturer --ozone-platform=wayland/' "$CONFIG_DIR/config.conf"
+    log_adapt "config.conf: SUPER+A now launches Discord with the same --ozone-platform=wayland/PipeWire flags as autostart.sh, so screen sharing works no matter how you opened it"
+fi
+
+# 9) xdg-desktop-portal: with both -wlr and -gtk backends installed, explicitly
+#    pin ScreenCast/Screenshot to wlr so Discord's share picker reliably talks
+#    to the backend that actually implements it, instead of depending on
+#    whichever portal happened to register first at boot.
+mkdir -p "$HOME/.config/xdg-desktop-portal"
+cat > "$HOME/.config/xdg-desktop-portal/portals.conf" <<'PORTALSEOF'
+[preferred]
+default=gtk
+org.freedesktop.impl.portal.ScreenCast=wlr
+org.freedesktop.impl.portal.Screenshot=wlr
+PORTALSEOF
+log_adapt "Added ~/.config/xdg-desktop-portal/portals.conf pinning ScreenCast/Screenshot to xdg-desktop-portal-wlr (the gtk portal doesn't implement screen sharing at all) — makes Discord screen share reliable regardless of portal startup order"
+
 ok "Corrections applied"
 
 # ---------- CPU temperature sensor (waybar) ----------
@@ -491,7 +610,7 @@ if [[ "${#OUTPUTS[@]}" -gt 0 ]]; then
     log_adapt "kanshi: auto-generated a profile for the detected output(s) (${OUTPUTS[*]}) instead of the repo's hardcoded DP-1/HDMI-A-1 profile, using each display's native mode (max resolution+Hz) rather than a fixed one"
 else
     warn "No monitor configured for kanshi. Falling back to the repo's bundled two-monitor profile (DP-1 + HDMI-A-1) as a starting point — edit ~/.config/kanshi/config if your outputs are named differently."
-    KANSHI_SRC="$CONFIG_DIR/kohagi_personal_configs/kanshi (if_u_have_2_monitors)/config"
+    KANSHI_SRC="$CONFIG_DIR/config/kanshi (if_u_have_2_monitors)/config"
     if [[ -f "$KANSHI_SRC" ]]; then
         mkdir -p "$HOME/.config/kanshi"
         cp "$KANSHI_SRC" "$HOME/.config/kanshi/config"
@@ -524,7 +643,7 @@ log_adapt "GTK theme: applied Materia-dark the same way nwg-look would (gtk-3.0/
 
 # ---------- fastfetch (outside ~/.config/mango) ----------
 step "Configuring fastfetch"
-FASTFETCH_SRC="$CONFIG_DIR/kohagi_personal_configs/terminal_configs/fastfetch.jsonc"
+FASTFETCH_SRC="$CONFIG_DIR/config/terminal_configs/fastfetch.jsonc"
 if [[ -f "$FASTFETCH_SRC" ]]; then
     mkdir -p "$HOME/.config/fastfetch"
     cp "$FASTFETCH_SRC" "$HOME/.config/fastfetch/config.jsonc"
@@ -539,7 +658,7 @@ fi
 # ---------- terminal welcome image ----------
 step "Terminal image"
 mkdir -p "$HOME/img_terminal"
-EXAMPLE_IMG="$CONFIG_DIR/kohagi_personal_configs/terminal_configs/img_terminal/example.png"
+EXAMPLE_IMG="$CONFIG_DIR/config/terminal_configs/img_terminal/example.png"
 if [[ -f "$EXAMPLE_IMG" && -z "$(ls -A "$HOME/img_terminal" 2>/dev/null)" ]]; then
     cp "$EXAMPLE_IMG" "$HOME/img_terminal/"
     ok "Example image copied to ~/img_terminal/"
@@ -550,7 +669,7 @@ fi
 
 # ---------- random_image.sh + fish ----------
 step "Configuring the terminal welcome script"
-RANDIMG_SRC="$CONFIG_DIR/kohagi_personal_configs/terminal_configs/random_image.sh"
+RANDIMG_SRC="$CONFIG_DIR/config/terminal_configs/random_image.sh"
 if [[ -f "$RANDIMG_SRC" ]]; then
     cp "$RANDIMG_SRC" "$HOME/random_image.sh"
     chmod +x "$HOME/random_image.sh"
@@ -593,7 +712,7 @@ ok "Scripts marked executable"
 
 # ---------- cursor ----------
 step "Cursor (Animated-Mew-Cursor)"
-CURSOR_SRC="$CONFIG_DIR/kohagi_personal_configs/Animated-Mew-Cursor"
+CURSOR_SRC="$CONFIG_DIR/config/Animated-Mew-Cursor"
 CURSOR_DST="$HOME/.local/share/icons/Animated-Mew-Cursor"
 if [[ -d "$CURSOR_SRC" ]]; then
     mkdir -p "$HOME/.local/share/icons"
@@ -618,7 +737,7 @@ else
 fi
 
 # ---------- GRUB (ultragrub: theme + boot entry patch) ----------
-ULTRAGRUB_DIR="$CONFIG_DIR/kohagi_personal_configs/ultragrub"
+ULTRAGRUB_DIR="$CONFIG_DIR/config/ultragrub"
 if [[ -d "$ULTRAGRUB_DIR" ]]; then
     step "GRUB theme (UltraGrub)"
     warn "This step touches /etc/default/grub and the scripts in /etc/grub.d (your bootloader)."

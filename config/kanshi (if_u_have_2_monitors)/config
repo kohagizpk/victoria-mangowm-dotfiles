@@ -1,0 +1,7 @@
+profile dual {
+    # Monitor principal – 165Hz
+    output DP-1 enable mode 1920x1080@165 position 0,0 scale 1
+
+    # Monitor secundário – 60Hz
+    output HDMI-A-1 enable mode 1920x1080@60 position 1920,0 scale 1
+}

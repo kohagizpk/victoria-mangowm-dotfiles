@@ -1,0 +1,284 @@
+/* -------------------------
+   Arquivo unificado gerado automaticamente
+   Conteúdo: colors-rofi.rasi (primeiro) + rofi-theme.rasi (depois)
+   Se precisar que eu remova duplicatas ou faça 'inlining', avise.
+   ------------------------- */
+
+/* -- BEGIN colors-rofi.rasi -- */
+ /* ---- 💫 https://github.com/JaKooLit 💫 ---- */  
+ /* wallust template - colors-rofi */
+
+* {
+active-background: #784CA0;
+active-foreground: #FAE8E1;
+normal-background: #181519;
+normal-foreground: #FAE8E1;
+urgent-background: #CC659A;
+urgent-foreground: #FAE8E1;
+
+alternate-active-background: #914B4B;
+alternate-active-foreground: #FAE8E1;
+alternate-normal-background: #181519;
+alternate-normal-foreground: #FAE8E1;
+alternate-urgent-background: #181519;
+alternate-urgent-foreground: #FAE8E1;
+
+selected-active-background: #CC659A;
+selected-active-foreground: #FAE8E1;
+selected-normal-background: #CC659A;
+selected-normal-foreground: #FAE8E1;
+selected-urgent-background: #784CA0;
+selected-urgent-foreground: #FAE8E1;
+
+background-color: #181519;
+background: rgba(0,0,0,0.7);
+foreground: #FAE8E1;
+border-color: #784CA0;
+
+color0: #3F3C40;
+color1: #1A1022;
+color2: #492E61;
+color3: #6D3838;
+color4: #5A3978;
+color5: #994C74;
+color6: #B58E80;
+color7: #F0D6CC;
+color8: #A8958F;
+color9: #23152D;
+color10: #613D81;
+color11: #914B4B;
+color12: #784CA0;
+color13: #CC659A;
+color14: #F2BDAA;
+color15: #F0D6CC;
+
+
+}
+
+
+/* -- END colors-rofi.rasi -- */
+
+/* -- BEGIN rofi-theme.rasi -- */
+/* ---- 💫 https://github.com/JaKooLit 💫 ---- */
+/* KooL Hyprland Rofi Style 3 - Full screen v2 */
+/* credit: https://github.com/adi1090x/rofi */
+
+/*****----- Configuration -----*****/
+configuration {
+    modi:                       "drun,run,filebrowser";
+    show-icons:                 true;
+    display-drun:               "  apps";
+    display-run:                "  term";
+    display-filebrowser:        "  files";
+    display-window:             "  window";
+	display-ssh:                " SSH";
+    drun-display-format:        "{name}";
+    window-format:              "{w} · {c} · {t}";
+    hover-select:               true;
+    me-select-entry:            "MouseSecondary";
+    me-accept-entry:            "MousePrimary";
+}
+
+/*****----- Global Properties -----*****/
+* {
+    background-alt: @color7;
+    selected:       @color12;
+    active:         @color11;
+    urgent:         red;
+    
+    border-color:                @selected;
+    handle-color:                @selected;
+    background-color:            @background;
+    foreground-color:            @foreground;
+    alternate-background:        @background-alt;
+    normal-background:           @background;
+    normal-foreground:           @foreground;
+    urgent-background:           @urgent;
+    urgent-foreground:           @background;
+    active-background:           @active;
+    active-foreground:           @background;
+    selected-normal-background:  @selected;
+    selected-normal-foreground:  @background;
+    selected-urgent-background:  @active;
+    selected-urgent-foreground:  @background;
+    selected-active-background:  @urgent;
+    selected-active-foreground:  @background;
+    alternate-normal-background: @background;
+    alternate-normal-foreground: @foreground;
+    alternate-urgent-background: @urgent;
+    alternate-urgent-foreground: @background;
+    alternate-active-background: @active;
+    alternate-active-foreground: @background;
+    
+
+}
+
+
+/*****----- Main Window -----*****/
+window {
+    transparency:                "real";
+    location:                    center;
+    anchor:                      center;
+    fullscreen:                  true;
+    x-offset:                    0px;
+    y-offset:                    0px;
+
+    enabled:                     true;
+    margin:                      0px;
+    padding:                     0px;
+    border:                      0px solid;
+    border-radius:               0px;
+    border-color:                @selected;
+    background-color:            black / 10%;
+    cursor:                      "default";
+}
+
+/*****----- Main Box -----*****/
+mainbox {
+    enabled:                     true;
+    spacing:                     100px;
+    margin:                      0px;
+    padding:                     100px 225px;
+    border:                      0px solid;
+    border-radius:               0px 0px 0px 0px;
+    border-color:                @selected;
+    background-color:            transparent;
+    children:                    [ "inputbar", "message", "listview" ];
+}
+
+/*****----- Inputbar -----*****/
+inputbar {
+    enabled:                     true;
+    spacing:                     10px;
+    margin:                      0% 28%;
+    padding:                     10px;
+    border:                      1px solid;
+    border-radius:               6px;
+    border-color:                white / 25%;
+    background-color:            white / 5%;
+    text-color:                  @foreground;
+    children:                    [ "prompt", "entry" ];
+}
+
+prompt {
+    enabled:                     true;
+    background-color:            transparent;
+    text-color:                  inherit;
+}
+textbox-prompt-colon {
+    enabled:                     true;
+    expand:                      false;
+    str:                         "::";
+    background-color:            transparent;
+    text-color:                  inherit;
+}
+entry {
+    enabled:                     true;
+    background-color:            transparent;
+    text-color:                  @foreground;
+    cursor:                      text;
+    placeholder:                 "  Search  👀 NOTE: CTRL TAB to change MODE";
+    placeholder-color:           inherit;
+}
+
+/*****----- Listview -----*****/
+listview {
+    enabled:                     true;
+    columns:                     7;
+    lines:                       4;
+    cycle:                       true;
+    dynamic:                     true;
+    scrollbar:                   false;
+    layout:                      vertical;
+    reverse:                     false;
+    fixed-height:                true;
+    fixed-columns:               true;
+    
+    spacing:                     0px;
+    margin:                      0px;
+    padding:                     0px;
+    border:                      0px solid;
+    border-radius:               0px;
+    border-color:                @selected;
+    background-color:            transparent;
+    text-color:                  @foreground;
+    cursor:                      "default";
+}
+scrollbar {
+    handle-width:                2px ;
+    handle-color:                @selected;
+    border-radius:               0px;
+    background-color:            @background-alt;
+}
+
+/*****----- Elements -----*****/
+element {
+    enabled:                     true;
+    spacing:                     15px;
+    margin:                      0px;
+    padding:                     35px 10px;
+    border:                      0px solid;
+    border-radius:               15px;
+    border-color:                @selected;
+    background-color:            transparent;
+    text-color:                  @foreground;
+    orientation:                 vertical;
+    cursor:                      pointer;
+}
+
+element normal.normal {
+    background-color:            transparent;
+    text-color:                  @foreground;
+}
+
+element selected.normal {
+    background-color:            inherit;
+    text-color:                  @foreground;
+}
+
+element-text selected,
+element selected.selected {
+    background-color:            white/50%;
+    text-color:                  @foreground;
+	border-radius:				 20px;
+	padding:					 20px;
+}
+
+element-icon {
+    background-color:            transparent;
+    text-color:                  inherit;
+    size:                        7%;
+    cursor:                      inherit;
+}
+element-text {
+    background-color:            transparent;
+    text-color:                  inherit;
+    highlight:                   inherit;
+    cursor:                      inherit;
+    vertical-align:              0.5;
+    horizontal-align:            0.5;
+	padding: 					 30px;
+}
+
+/*****----- Message -----*****/
+message {
+    background-color:            transparent;
+    border:                      0px;
+}
+error-message {
+    padding:                     0px;
+    border-color:                @selected;
+    background-color:            transparent;
+    text-color:                  @foreground;
+}
+textbox {
+    padding:                     20px;
+    border-radius:               15px;
+    background-color:            white / 10%;
+    text-color:                  @foreground;
+    vertical-align:              0.5;
+    horizontal-align:            0.5;
+    highlight:                   none;
+}
+
+/* -- END rofi-theme.rasi -- */

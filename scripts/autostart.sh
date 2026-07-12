@@ -33,7 +33,7 @@ waybar -c ~/.config/mango/waybar/config.jsonc -s ~/.config/mango/waybar/style.cs
 waypaper --restore &
 kanshi &
 swaync &
-discord --enable-features=UseOzonePlatform,WebRTCPipeWireCapturer --ozone-platform=wayland &
+discord &
 spotify &
 helium-browser &
 wl-clip-persist --clipboard regular --reconnect-tries 0 &
