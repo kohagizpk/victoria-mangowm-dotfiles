@@ -888,7 +888,62 @@ else
     fi
 fi
 
-# ---------- GTK theme (Materia-dark, the same files nwg-look would write) ----------
+# ---------- keyboard layout ----------
+step "Keyboard layout"
+echo "    1) us  — US"
+echo "    2) br  — Brazil (ABNT2)"
+echo "    3) de  — Germany"
+echo "    4) fr  — France"
+echo "    5) es  — Spain"
+echo "    6) gb  — UK"
+echo "    7) it  — Italy"
+echo "    8) pt  — Portugal"
+echo "    9) other (type the code yourself)"
+kb_reply=""
+while [[ ! "$kb_reply" =~ ^[1-9]$ ]]; do
+    read -rp "Pick your keyboard layout [1-9]: " kb_reply
+done
+case "$kb_reply" in
+    1) KB_LAYOUT="us"; KB_CONSOLE="us" ;;
+    2) KB_LAYOUT="br"; KB_CONSOLE="br-abnt2" ;;
+    3) KB_LAYOUT="de"; KB_CONSOLE="de" ;;
+    4) KB_LAYOUT="fr"; KB_CONSOLE="fr" ;;
+    5) KB_LAYOUT="es"; KB_CONSOLE="es" ;;
+    6) KB_LAYOUT="gb"; KB_CONSOLE="uk" ;;   # XKB calls it "gb", the console keymap is named "uk"
+    7) KB_LAYOUT="it"; KB_CONSOLE="it" ;;
+    8) KB_LAYOUT="pt"; KB_CONSOLE="pt-latin1" ;;
+    9)
+        read -rp "XKB layout code for config.conf (e.g. us, br, de-nodeadkeys): " KB_LAYOUT
+        read -rp "Matching console keymap (e.g. us, br-abnt2 — leave empty to skip): " KB_CONSOLE
+        ;;
+esac
+
+if [[ -n "$KB_LAYOUT" && -f "$CONFIG_DIR/config.conf" ]]; then
+    if grep -q '^xkb_rules_layout=' "$CONFIG_DIR/config.conf"; then
+        sed -i "s/^xkb_rules_layout=.*/xkb_rules_layout=${KB_LAYOUT}/" "$CONFIG_DIR/config.conf"
+    else
+        printf '\n# keyboard layout (set by install.sh)\nxkb_rules_layout=%s\n' "$KB_LAYOUT" >> "$CONFIG_DIR/config.conf"
+    fi
+    ok "config.conf: xkb_rules_layout=$KB_LAYOUT"
+    log_adapt "config.conf: keyboard layout set to '$KB_LAYOUT'"
+fi
+
+if [[ -n "${KB_CONSOLE:-}" ]]; then
+    if [[ -f /etc/vconsole.conf ]] && grep -q '^KEYMAP=' /etc/vconsole.conf; then
+        sudo sed -i "s/^KEYMAP=.*/KEYMAP=${KB_CONSOLE}/" /etc/vconsole.conf
+    else
+        printf 'KEYMAP=%s\n' "$KB_CONSOLE" | sudo tee -a /etc/vconsole.conf >/dev/null
+    fi
+    if [[ "$INIT_SYSTEM" == "systemd" ]]; then
+        sudo localectl set-keymap "$KB_CONSOLE" 2>/dev/null || true
+    else
+        sudo loadkeys "$KB_CONSOLE" 2>/dev/null || true
+    fi
+    ok "Console/TTY keymap: $KB_CONSOLE (/etc/vconsole.conf)"
+    log_adapt "Console keymap set to $KB_CONSOLE, matching the $KB_LAYOUT layout in config.conf — so a bare TTY and the shell before mango even starts use the same layout, not just the graphical session"
+fi
+
+
 step "GTK theme (Materia-dark)"
 mkdir -p "$HOME/.config/gtk-3.0" "$HOME/.config/gtk-4.0"
 for gtk_ini in "$HOME/.config/gtk-3.0/settings.ini" "$HOME/.config/gtk-4.0/settings.ini"; do
