@@ -75,6 +75,15 @@ confirm() {
 ADAPTATIONS=()
 log_adapt() { ADAPTATIONS+=("$1"); }
 
+on_error() {
+    local line="$1"
+    printf "\n${c_red}✗ Something went wrong at line %s.${c_reset}\n" "$line"
+    printf "  ${c_sub}Scroll up to see the actual error message right above this.${c_reset}\n"
+    printf "  ${c_sub}Most steps are safe to re-run — you can just run ./install.sh again;${c_reset}\n"
+    printf "  ${c_sub}already-installed packages and already-applied fixes are skipped automatically.${c_reset}\n"
+}
+trap 'on_error $LINENO' ERR
+
 banner
 
 # Moves aside every session entry except mango.desktop, so display managers
@@ -102,6 +111,11 @@ strip_other_sessions() {
 # ---------- initial checks ----------
 if [[ "${EUID}" -eq 0 ]]; then
     err "Don't run this as root. Run it as your normal user (it will ask for sudo when needed)."
+    exit 1
+fi
+
+if ! (echo > /dev/tcp/github.com/443) 2>/dev/null; then
+    err "Can't reach github.com — check your internet connection before running this (it downloads packages and dotfiles throughout)."
     exit 1
 fi
 
@@ -695,7 +709,7 @@ POLKITEOF
         log_adapt "scripts/autostart.sh: added a polkit agent startup (xfce-polkit) — nothing was providing GUI privilege prompts before"
     fi
 
-    WALLPAPER_FALLBACK="$(find "$CONFIG_DIR/config" -maxdepth 2 -iname 'wallpaper*.png' -o -iname 'wallpaper*.jpg' 2>/dev/null | head -1)"
+    WALLPAPER_FALLBACK="$(find "$CONFIG_DIR/config" "$CONFIG_DIR/wallpaper" -maxdepth 2 \( -iname 'wallpaper*.png' -o -iname 'wallpaper*.jpg' \) 2>/dev/null | head -1)"
     if grep -qx 'waypaper --restore &' "$AUTOSTART" && ! grep -q 'swaybg -i' "$AUTOSTART" && [[ -n "$WALLPAPER_FALLBACK" ]]; then
         sed -i '/^waypaper --restore &$/c\
 if [ -f "$HOME/.config/waypaper/config.ini" ]; then\
@@ -806,6 +820,16 @@ org.freedesktop.impl.portal.Screenshot=wlr
 PORTALSEOF
 log_adapt "Added ~/.config/xdg-desktop-portal/portals.conf pinning ScreenCast/Screenshot to xdg-desktop-portal-wlr (the gtk portal doesn't implement screen sharing at all) — makes Discord screen share reliable regardless of portal startup order"
 
+# 10) mango can't bind btn_left/btn_right with modifier NONE (this is a known
+#     engine limitation, not a config mistake — upstream's own example config
+#     has the exact same comment). It logs an error and just skips the bind,
+#     but toggleoverview/killclient already have working keybinds elsewhere
+#     (ALT+Tab, SUPER+q), so these two lines are pure noise on every start.
+if [[ -f "$CONFIG_DIR/config.conf" ]] && grep -q '^mousebind=NONE,btn_\(left\|right\),' "$CONFIG_DIR/config.conf"; then
+    sed -i -E 's/^(mousebind=NONE,btn_(left|right),.*)$/# \1  # mango can'"'"'t bind btn_left\/btn_right with NONE - already bound to ALT+Tab \/ SUPER+q/' "$CONFIG_DIR/config.conf"
+    log_adapt "config.conf: commented out mousebind=NONE,btn_left/btn_right (mango rejects NONE as a modifier for those two buttons — it's a known engine limitation, and both actions already have working keybinds: ALT+Tab and SUPER+q)"
+fi
+
 ok "Corrections applied"
 
 # ---------- CPU temperature sensor (waybar) ----------
@@ -890,33 +914,46 @@ fi
 
 # ---------- keyboard layout ----------
 step "Keyboard layout"
-echo "    1) us  — US"
-echo "    2) br  — Brazil (ABNT2)"
-echo "    3) de  — Germany"
-echo "    4) fr  — France"
-echo "    5) es  — Spain"
-echo "    6) gb  — UK"
-echo "    7) it  — Italy"
-echo "    8) pt  — Portugal"
-echo "    9) other (type the code yourself)"
+echo "    1) us       — US"
+echo "    2) br       — Brazil (ABNT2)"
+echo "    3) br-intl  — Brazil (ABNT2, international/dead-key variant)"
+echo "    4) de       — Germany"
+echo "    5) fr       — France"
+echo "    6) es       — Spain"
+echo "    7) gb       — UK"
+echo "    8) it       — Italy"
+echo "    9) pt       — Portugal"
+echo "    10) other (type the code yourself)"
 kb_reply=""
-while [[ ! "$kb_reply" =~ ^[1-9]$ ]]; do
-    read -rp "Pick your keyboard layout [1-9]: " kb_reply
+while [[ ! "$kb_reply" =~ ^([1-9]|10)$ ]]; do
+    read -rp "Pick your keyboard layout [1-10]: " kb_reply
 done
+KB_VARIANT=""
 case "$kb_reply" in
-    1) KB_LAYOUT="us"; KB_CONSOLE="us" ;;
-    2) KB_LAYOUT="br"; KB_CONSOLE="br-abnt2" ;;
-    3) KB_LAYOUT="de"; KB_CONSOLE="de" ;;
-    4) KB_LAYOUT="fr"; KB_CONSOLE="fr" ;;
-    5) KB_LAYOUT="es"; KB_CONSOLE="es" ;;
-    6) KB_LAYOUT="gb"; KB_CONSOLE="uk" ;;   # XKB calls it "gb", the console keymap is named "uk"
-    7) KB_LAYOUT="it"; KB_CONSOLE="it" ;;
-    8) KB_LAYOUT="pt"; KB_CONSOLE="pt-latin1" ;;
-    9)
-        read -rp "XKB layout code for config.conf (e.g. us, br, de-nodeadkeys): " KB_LAYOUT
+    1)  KB_LAYOUT="us"; KB_CONSOLE="us" ;;
+    2)  KB_LAYOUT="br"; KB_CONSOLE="br-abnt2" ;;
+    3)  KB_LAYOUT="br"; KB_VARIANT="intl"; KB_CONSOLE="br-abnt2" ;;
+    4)  KB_LAYOUT="de"; KB_CONSOLE="de" ;;
+    5)  KB_LAYOUT="fr"; KB_CONSOLE="fr" ;;
+    6)  KB_LAYOUT="es"; KB_CONSOLE="es" ;;
+    7)  KB_LAYOUT="gb"; KB_CONSOLE="uk" ;;   # XKB calls it "gb", the console keymap is named "uk"
+    8)  KB_LAYOUT="it"; KB_CONSOLE="it" ;;
+    9)  KB_LAYOUT="pt"; KB_CONSOLE="pt-latin1" ;;
+    10)
+        read -rp "XKB layout code for config.conf (e.g. us, br, de — NOT 'br(intl)', see next question): " KB_LAYOUT
+        read -rp "Variant, if any (e.g. intl, nodeadkeys — leave empty for none): " KB_VARIANT
         read -rp "Matching console keymap (e.g. us, br-abnt2 — leave empty to skip): " KB_CONSOLE
         ;;
 esac
+
+# Defensive: if someone typed setxkbmap-style "layout(variant)" in a custom
+# entry (e.g. "br(intl)"), split it instead of writing that literal string
+# into xkb_rules_layout — mango expects layout and variant as separate
+# fields, and xkbcommon fails to compile the keymap otherwise.
+if [[ "$KB_LAYOUT" =~ ^([a-zA-Z0-9_-]+)\(([a-zA-Z0-9_-]+)\)$ ]]; then
+    KB_VARIANT="${BASH_REMATCH[2]}"
+    KB_LAYOUT="${BASH_REMATCH[1]}"
+fi
 
 if [[ -n "$KB_LAYOUT" && -f "$CONFIG_DIR/config.conf" ]]; then
     if grep -q '^xkb_rules_layout=' "$CONFIG_DIR/config.conf"; then
@@ -924,8 +961,13 @@ if [[ -n "$KB_LAYOUT" && -f "$CONFIG_DIR/config.conf" ]]; then
     else
         printf '\n# keyboard layout (set by install.sh)\nxkb_rules_layout=%s\n' "$KB_LAYOUT" >> "$CONFIG_DIR/config.conf"
     fi
-    ok "config.conf: xkb_rules_layout=$KB_LAYOUT"
-    log_adapt "config.conf: keyboard layout set to '$KB_LAYOUT'"
+    if grep -q '^xkb_rules_variant=' "$CONFIG_DIR/config.conf"; then
+        sed -i "s/^xkb_rules_variant=.*/xkb_rules_variant=${KB_VARIANT}/" "$CONFIG_DIR/config.conf"
+    elif [[ -n "$KB_VARIANT" ]]; then
+        sed -i "/^xkb_rules_layout=${KB_LAYOUT}$/a xkb_rules_variant=${KB_VARIANT}" "$CONFIG_DIR/config.conf"
+    fi
+    ok "config.conf: xkb_rules_layout=$KB_LAYOUT${KB_VARIANT:+, xkb_rules_variant=$KB_VARIANT}"
+    log_adapt "config.conf: keyboard layout set to '$KB_LAYOUT'${KB_VARIANT:+ (variant: $KB_VARIANT)}"
 fi
 
 if [[ -n "${KB_CONSOLE:-}" ]]; then
@@ -1005,6 +1047,11 @@ EOF
     else
         info "~/.config/fish/config.fish already calls fastfetch"
     fi
+fi
+
+if command -v fish >/dev/null 2>&1; then
+    fish -c 'set -U fish_greeting' 2>/dev/null || true
+    ok "Disabled fish's startup greeting"
 fi
 
 # ---------- kitty ----------
@@ -1110,6 +1157,39 @@ if [[ -n "$FISH_BIN" && "$SHELL" != "$FISH_BIN" ]]; then
     fi
 else
     info "Already fish, or fish isn't installed"
+fi
+
+# ---------- health check ----------
+step "Health check"
+HEALTH_OK=1
+check_cmd() {
+    if command -v "$1" >/dev/null 2>&1; then
+        ok "$1 found"
+    else
+        warn "$1 not found"
+        HEALTH_OK=0
+    fi
+}
+check_file() {
+    if [[ -e "$1" ]]; then
+        ok "$2"
+    else
+        warn "$2 — missing ($1)"
+        HEALTH_OK=0
+    fi
+}
+check_cmd mango
+check_cmd waybar
+check_cmd kitty
+check_cmd fish
+check_cmd mmsg
+check_file "$CONFIG_DIR/config.conf" "config.conf deployed"
+check_file "$HOME/.config/wlogout/layout" "wlogout theme deployed"
+check_file "$HOME/.local/share/icons/Animated-Mew-Cursor" "cursor theme installed"
+if [[ "$HEALTH_OK" -eq 1 ]]; then
+    ok "Everything checks out"
+else
+    warn "Some things above are missing — scroll up for what failed, or just re-run the script; it's safe to run more than once."
 fi
 
 # ---------- summary ----------
