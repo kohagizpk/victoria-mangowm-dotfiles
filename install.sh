@@ -17,23 +17,65 @@ set -euo pipefail
 REPO_URL="https://github.com/kohagizpk/victoria-mangowm-dotfiles.git"
 CONFIG_DIR="$HOME/.config/mango"
 
-# ---------- helpers ----------
-c_reset='\033[0m'; c_bold='\033[1m'; c_green='\033[1;32m'; c_yellow='\033[1;33m'; c_red='\033[1;31m'; c_blue='\033[1;34m'
+# ---------- palette (catppuccin mocha, same accents as the waybar theme) ----------
+c_reset='\033[0m'; c_bold='\033[1m'; c_dim='\033[2m'
+c_mauve='\033[38;2;203;166;247m'; c_pink='\033[38;2;243;139;168m'
+c_green='\033[38;2;166;227;161m'; c_yellow='\033[38;2;249;226;175m'
+c_red='\033[38;2;243;139;168m';   c_blue='\033[38;2;137;180;250m'
+c_sub='\033[38;2;108;112;134m'
 
-step()  { printf "\n${c_blue}==>${c_reset} ${c_bold}%s${c_reset}\n" "$1"; }
-info()  { printf "    %s\n" "$1"; }
-ok()    { printf "${c_green}[ok]${c_reset} %s\n" "$1"; }
-warn()  { printf "${c_yellow}[warn]${c_reset} %s\n" "$1"; }
-err()   { printf "${c_red}[error]${c_reset} %s\n" "$1"; }
+STEP_NUM=0
+TOTAL_STEPS="$(grep -c '^step "' "${BASH_SOURCE[0]}" 2>/dev/null || echo '?')"
+
+step()  { STEP_NUM=$((STEP_NUM + 1)); printf "\n${c_mauve}❯${c_reset} ${c_sub}[%s/%s]${c_reset} ${c_bold}%s${c_reset}\n" "$STEP_NUM" "$TOTAL_STEPS" "$1"; }
+info()  { printf "  ${c_sub}·${c_reset} %s\n" "$1"; }
+ok()    { printf "  ${c_green}✓${c_reset} %s\n" "$1"; }
+warn()  { printf "  ${c_yellow}!${c_reset} %s\n" "$1"; }
+err()   { printf "  ${c_red}✗${c_reset} %s\n" "$1"; }
+
+box() {
+    local text="$1" color="${2:-$c_mauve}" len border
+    len=${#text}
+    border="$(printf '─%.0s' $(seq 1 $((len + 2))))"
+    printf "${color}╭%s╮${c_reset}\n" "$border"
+    printf "${color}│${c_reset} ${c_bold}%s${c_reset} ${color}│${c_reset}\n" "$text"
+    printf "${color}╰%s╯${c_reset}\n" "$border"
+}
+
+banner() {
+    local lines=(
+'   :::     ::: ::::::::::: :::::::: ::::::::::: ::::::::  :::::::::  :::::::::::     :::  '
+'  :+:     :+:     :+:    :+:    :+:    :+:    :+:    :+: :+:    :+:     :+:       :+: :+: '
+' +:+     +:+     +:+    +:+           +:+    +:+    +:+ +:+    +:+     +:+      +:+   +:+ '
+'+#+     +:+     +#+    +#+           +#+    +#+    +:+ +#++:++#:      +#+     +#++:++#++: '
+'+#+   +#+      +#+    +#+           +#+    +#+    +#+ +#+    +#+     +#+     +#+     +#+  '
+'#+#+#+#       #+#    #+#    #+#    #+#    #+#    #+# #+#    #+#     #+#     #+#     #+#   '
+' ###     ########### ########     ###     ########  ###    ### ########### ###     ###    '
+    )
+    local n=${#lines[@]}
+    # gradient: mauve (#cba6f7) -> pink (#f38ba8), matching the waybar accent colors
+    local r1=203 g1=166 b1=247 r2=243 g2=139 b2=168
+    local i r g b
+    echo
+    for i in "${!lines[@]}"; do
+        r=$(( r1 + (r2 - r1) * i / (n - 1) ))
+        g=$(( g1 + (g2 - g1) * i / (n - 1) ))
+        b=$(( b1 + (b2 - b1) * i / (n - 1) ))
+        printf "\033[1m\033[38;2;%d;%d;%dm%s\033[0m\n" "$r" "$g" "$b" "${lines[$i]}"
+    done
+    printf "\n${c_sub}  mango window manager · victoria-mangowm-dotfiles installer${c_reset}\n\n"
+}
 
 confirm() {
     local reply
-    read -rp "$1 [y/N] " reply
+    read -rp "$(printf "${c_mauve}?${c_reset} %s " "$1")[y/N] " reply
     [[ "$reply" =~ ^[yY]$ ]]
 }
 
 ADAPTATIONS=()
 log_adapt() { ADAPTATIONS+=("$1"); }
+
+banner
 
 # Moves aside every session entry except mango.desktop, so display managers
 # (ly) only ever list Mango. Reversible: nothing is deleted, just moved.
@@ -150,7 +192,7 @@ else
     fi
 fi
 
-echo -e "${c_bold}victoria-mangowm-dotfiles installer${c_reset}"
+box "victoria-mangowm-dotfiles installer"
 info "Source: $SOURCE_DIR"
 info "Target: $CONFIG_DIR"
 info "Distro family: $DISTRO_FAMILY"
@@ -1016,20 +1058,19 @@ else
 fi
 
 # ---------- summary ----------
-step "Done"
+echo
+box "Done — welcome to Mango" "$c_green"
 info "Init system: $INIT_SYSTEM"
 if [[ "${#ADAPTATIONS[@]}" -gt 0 ]]; then
-    echo -e "${c_bold}Adaptations made (the original repo had these broken or incomplete):${c_reset}"
+    printf "\n${c_bold}${c_mauve}Adaptations made${c_reset} ${c_sub}(the original repo had these broken or incomplete)${c_reset}\n"
     for a in "${ADAPTATIONS[@]}"; do
-        printf "  - %s\n" "$a"
+        printf "  ${c_mauve}›${c_reset} %s\n" "$a"
     done
 fi
-echo
-echo -e "${c_bold}Worth double-checking by hand:${c_reset}"
+printf "\n${c_bold}${c_yellow}Worth double-checking by hand${c_reset}\n"
 info "Monitor output names picked for kanshi: ${OUTPUTS[*]:-none} — run 'wlr-randr' once mango is running to confirm they match"
 info "The Animated-Mew-Cursor theme, if it wasn't already installed (see the warning above)"
 info "Pick a wallpaper with SUPER+F (waypaper) any time you want to change it"
 echo
-info "To start: log in on a TTY and run 'mango'"
-set -U fish_greeting
-sudo systemctl start ly@tty2.service
+printf "${c_bold}${c_blue}To start:${c_reset} log in on a TTY and run '%bmango%b', or pick Mango from ly's session list.\n" "$c_mauve" "$c_reset"
+echo
