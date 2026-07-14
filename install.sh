@@ -17,6 +17,18 @@ set -euo pipefail
 REPO_URL="https://github.com/kohagizpk/victoria-mangowm-dotfiles.git"
 CONFIG_DIR="$HOME/.config/mango"
 
+DRY_RUN=0
+for arg in "$@"; do
+    case "$arg" in
+        --dry-run) DRY_RUN=1 ;;
+        -h|--help)
+            echo "Usage: $0 [--dry-run]"
+            echo "  --dry-run   Show every command this script would run, without running any of it."
+            exit 0
+            ;;
+    esac
+done
+
 # ---------- palette (catppuccin mocha, same accents as the waybar theme) ----------
 c_reset='\033[0m'; c_bold='\033[1m'; c_dim='\033[2m'
 c_mauve='\033[38;2;203;166;247m'; c_pink='\033[38;2;243;139;168m'
@@ -69,6 +81,60 @@ confirm() {
     local reply
     read -rp "$(printf "${c_mauve}?${c_reset} %s " "$1")[y/N] " reply
     [[ "$reply" =~ ^[yY]$ ]]
+}
+
+# Runs a command for real, or — in --dry-run — just prints it and returns
+# success so the rest of the script's if/else logic still flows naturally.
+run() {
+    if [[ "$DRY_RUN" -eq 1 ]]; then
+        printf "  ${c_dim}would run:${c_reset} %s\n" "$*"
+        return 0
+    fi
+    "$@"
+}
+
+# Same idea for anything that writes/edits a file. Use write_to/sudo_write_to
+# in place of `cat >`/`sudo tee` in front of a heredoc — in --dry-run it just
+# announces the write and discards the content instead of touching the file.
+write_to() {
+    if [[ "$DRY_RUN" -eq 1 ]]; then
+        printf "  ${c_dim}would write:${c_reset} %s\n" "$1"
+        cat >/dev/null
+    else
+        cat > "$1"
+    fi
+}
+write_to_append() {
+    if [[ "$DRY_RUN" -eq 1 ]]; then
+        printf "  ${c_dim}would append to:${c_reset} %s\n" "$1"
+        cat >/dev/null
+    else
+        cat >> "$1"
+    fi
+}
+sudo_write_to() {
+    if [[ "$DRY_RUN" -eq 1 ]]; then
+        printf "  ${c_dim}would write (as root):${c_reset} %s\n" "$1"
+        cat >/dev/null
+    else
+        sudo tee "$1" >/dev/null
+    fi
+}
+sudo_write_to_append() {
+    if [[ "$DRY_RUN" -eq 1 ]]; then
+        printf "  ${c_dim}would append to (as root):${c_reset} %s\n" "$1"
+        cat >/dev/null
+    else
+        sudo tee -a "$1" >/dev/null
+    fi
+}
+# sed -i, wrapped the same way — announces the edit instead of making it.
+run_sed() {
+    if [[ "$DRY_RUN" -eq 1 ]]; then
+        printf "  ${c_dim}would edit:${c_reset} %s\n" "${*: -1}"
+        return 0
+    fi
+    sed "$@"
 }
 
 ADAPTATIONS=()
@@ -205,22 +271,66 @@ else
     fi
 fi
 
+# ---------- keyboard layout (asked here, applied later once config.conf exists) ----------
+echo
+echo "    1) us       — US"
+echo "    2) br       — Brazil (ABNT2)"
+echo "    3) br-intl  — Brazil (ABNT2, international/dead-key variant)"
+echo "    4) de       — Germany"
+echo "    5) fr       — France"
+echo "    6) es       — Spain"
+echo "    7) gb       — UK"
+echo "    8) it       — Italy"
+echo "    9) pt       — Portugal"
+echo "    10) other (type the code yourself)"
+kb_reply=""
+while [[ ! "$kb_reply" =~ ^([1-9]|10)$ ]]; do
+    read -rp "Keyboard layout [1-10]: " kb_reply
+done
+KB_VARIANT=""
+case "$kb_reply" in
+    1)  KB_LAYOUT="us"; KB_CONSOLE="us" ;;
+    2)  KB_LAYOUT="br"; KB_CONSOLE="br-abnt2" ;;
+    3)  KB_LAYOUT="br"; KB_VARIANT="intl"; KB_CONSOLE="br-abnt2" ;;
+    4)  KB_LAYOUT="de"; KB_CONSOLE="de" ;;
+    5)  KB_LAYOUT="fr"; KB_CONSOLE="fr" ;;
+    6)  KB_LAYOUT="es"; KB_CONSOLE="es" ;;
+    7)  KB_LAYOUT="gb"; KB_CONSOLE="uk" ;;   # XKB calls it "gb", the console keymap is named "uk"
+    8)  KB_LAYOUT="it"; KB_CONSOLE="it" ;;
+    9)  KB_LAYOUT="pt"; KB_CONSOLE="pt-latin1" ;;
+    10)
+        read -rp "XKB layout code for config.conf (e.g. us, br, de — NOT 'br(intl)', see next question): " KB_LAYOUT
+        read -rp "Variant, if any (e.g. intl, nodeadkeys — leave empty for none): " KB_VARIANT
+        read -rp "Matching console keymap (e.g. us, br-abnt2 — leave empty to skip): " KB_CONSOLE
+        ;;
+esac
+
+# ---------- summary, archinstall-style: every choice made, before anything runs ----------
 box "victoria-mangowm-dotfiles installer"
-info "Source: $SOURCE_DIR"
-info "Target: $CONFIG_DIR"
-info "Distro family: $DISTRO_FAMILY"
-info "Init system: $INIT_SYSTEM"
-if ! confirm "Start?"; then
+info "Source:          $SOURCE_DIR"
+info "Target:          $CONFIG_DIR"
+info "Distro family:   $DISTRO_FAMILY"
+info "Init system:     $INIT_SYSTEM"
+info "Keyboard layout: ${KB_LAYOUT}${KB_VARIANT:+ ($KB_VARIANT)}"
+[[ "$DRY_RUN" -eq 1 ]] && info "Mode:            dry run — nothing will actually be installed or changed"
+if ! confirm "Everything above look right? Start?"; then
     exit 0
 fi
 
 # Ask for the sudo password once up front instead of ~20 separate times
 # throughout the script. sudo caches it for a while (usually 15 min); a
 # background loop keeps it refreshed for the rest of the run.
-sudo -v
-( while true; do sudo -n true; sleep 60; kill -0 "$$" 2>/dev/null || exit; done ) 2>/dev/null &
-SUDO_KEEPALIVE_PID=$!
-trap 'kill "$SUDO_KEEPALIVE_PID" 2>/dev/null' EXIT
+if [[ "$DRY_RUN" -eq 0 ]]; then
+    info "This needs sudo for package installs and a few system files — asking once now."
+    sudo -v
+    if sudo -n true 2>/dev/null; then
+        ( while true; do sleep 30; sudo -n true 2>/dev/null || exit; kill -0 "$$" 2>/dev/null || exit; done ) 2>/dev/null &
+        SUDO_KEEPALIVE_PID=$!
+        trap 'kill "$SUDO_KEEPALIVE_PID" 2>/dev/null' EXIT
+    else
+        warn "sudo isn't caching credentials on this system (some hardened setups disable that) — you'll be asked for your password a few more times as the script runs. That's normal, not a hang."
+    fi
+fi
 
 if [[ "$DISTRO_FAMILY" == "arch" ]]; then
     step "Syncing package databases"
@@ -400,8 +510,9 @@ esac
 
 step "Packages (${#PACKAGES[@]})"
 info "${PACKAGES[*]}"
+info "Using --noconfirm so this doesn't sit waiting on an easy-to-miss prompt (e.g. picking between multiple providers for the same package)."
 if confirm "Install everything now? (builds -git AUR packages, can take a while)"; then
-    "$AUR_HELPER" -S --needed "${PACKAGES[@]}"
+    run "$AUR_HELPER" -S --needed --noconfirm "${PACKAGES[@]}"
     ok "Packages installed"
 else
     warn "Skipped. The rest of the script continues, but the environment won't fully work until these are installed manually."
@@ -493,7 +604,7 @@ case "$INIT_SYSTEM" in
             done
             new_active="${consoles[*]}"
 
-            sudo sed -i "s|^ACTIVE_CONSOLES=.*|ACTIVE_CONSOLES=\"${new_active}\"|" "$CONSOLE_CONF"
+            run sudo sed -i "s|^ACTIVE_CONSOLES=.*|ACTIVE_CONSOLES=\"${new_active}\"|" "$CONSOLE_CONF"
             ok "Freed ${dinit_console} (dinit's own console) from ACTIVE_CONSOLES so ly can use it without fighting a getty"
             log_adapt "dinit: removed ${dinit_console} from $CONSOLE_CONF's ACTIVE_CONSOLES — without this, ly crash-loops with 'panic: reached unreachable code' because it and the getty on that tty fight over VT control. Requires a reboot to take effect."
             REBOOT_NEEDED_FOR_LY=1
@@ -550,7 +661,7 @@ if [[ "$DISTRO_FAMILY" == "fedora" ]]; then
         jetbrains-mono-fonts google-noto-emoji-color-fonts
         pipewire pipewire-pulseaudio wireplumber
         discord
-        wget jq
+        wget jq unzip
     )
 
     step "Packages (${#FEDORA_PACKAGES[@]})"
@@ -559,7 +670,7 @@ if [[ "$DISTRO_FAMILY" == "fedora" ]]; then
     FEDORA_FAILED=()
     if confirm "Install everything now?"; then
         for pkg in "${FEDORA_PACKAGES[@]}"; do
-            if ! sudo dnf install -y "$pkg"; then
+            if ! run sudo dnf install -y "$pkg"; then
                 FEDORA_FAILED+=("$pkg")
             fi
         done
@@ -572,19 +683,39 @@ if [[ "$DISTRO_FAMILY" == "fedora" ]]; then
         warn "Skipped. The rest of the script continues, but the environment won't fully work until these are installed manually."
     fi
 
+    # Fedora's jetbrains-mono-fonts package is the PLAIN font, not the Nerd
+    # Font build — it doesn't have the icon glyphs waybar/wlogout/rofi use,
+    # so they'd all render as blank boxes. There's no official dnf/COPR
+    # package worth depending on here, so grab the real thing straight from
+    # the upstream Nerd Fonts releases instead.
+    step "Nerd Font icons (waybar/wlogout glyphs)"
+    mkdir -p "$HOME/.local/share/fonts"
+    NF_ZIP="$(mktemp -u --suffix=.zip)"
+    if run curl -fsSL -o "$NF_ZIP" "https://github.com/ryanoasis/nerd-fonts/releases/latest/download/JetBrainsMono.zip"; then
+        mkdir -p "$HOME/.local/share/fonts/JetBrainsMonoNerdFont"
+        run unzip -o -q "$NF_ZIP" -d "$HOME/.local/share/fonts/JetBrainsMonoNerdFont"
+        run fc-cache -f "$HOME/.local/share/fonts" >/dev/null 2>&1
+        rm -f "$NF_ZIP"
+        ok "JetBrainsMono Nerd Font installed to ~/.local/share/fonts"
+        log_adapt "Fedora's jetbrains-mono-fonts package doesn't include the Nerd Font icon glyphs waybar/wlogout use -> downloaded the real Nerd Font build from the upstream GitHub releases instead of guessing at a COPR"
+    else
+        warn "Couldn't download the Nerd Font — waybar/wlogout icons will show as blank boxes until you install one from https://www.nerdfonts.com"
+    fi
+
+
     step "swaylock-effects (needs a COPR repo on Fedora)"
     if confirm "Enable the eddsalkield/swaylock-effects COPR and install it?"; then
-        sudo dnf copr enable -y eddsalkield/swaylock-effects || true
-        sudo dnf install -y swaylock-effects || warn "swaylock-effects install failed; falling back to plain swaylock."
-        sudo dnf install -y swaylock || true
+        run sudo dnf copr enable -y eddsalkield/swaylock-effects || true
+        run sudo dnf install -y swaylock-effects || warn "swaylock-effects install failed; falling back to plain swaylock."
+        run sudo dnf install -y swaylock || true
     fi
 
     step "materia-gtk-theme"
-    sudo dnf install -y materia-gtk-theme 2>/dev/null || warn "materia-gtk-theme isn't in Fedora's repos on this release; the GTK settings below will still point to it, install it manually (e.g. from a COPR) if it doesn't show up."
+    run sudo dnf install -y materia-gtk-theme 2>/dev/null || warn "materia-gtk-theme isn't in Fedora's repos on this release; the GTK settings below will still point to it, install it manually (e.g. from a COPR) if it doesn't show up."
 
     step "cliphist, wl-clipboard, wl-clip-persist, xfce-polkit, wmenu"
     for pkg in cliphist wl-clipboard wl-clip-persist xfce4-polkit wmenu; do
-        sudo dnf install -y "$pkg" || warn "$pkg not found under that name in your Fedora repos — search 'dnf search $pkg' and adjust by hand."
+        run sudo dnf install -y "$pkg" || warn "$pkg not found under that name in your Fedora repos — search 'dnf search $pkg' and adjust by hand."
     done
 
     step "ly (display manager)"
@@ -730,7 +861,7 @@ WLOGOUT_THEME_SCRIPT="$CONFIG_DIR/scripts/wlogout-theme.sh"
 
 # 1) waybar: systemctl -> loginctl (no systemd, running elogind)
 if [[ -f "$WAYBAR_JSONC" ]]; then
-    sed -i \
+    run_sed -i \
         -e 's/systemctl poweroff/loginctl poweroff/' \
         -e 's/systemctl reboot/loginctl reboot/' \
         "$WAYBAR_JSONC"
@@ -740,7 +871,7 @@ fi
 # 2) wlogout: hyprlock/hyprctl (Hyprland) don't exist here -> swaylock-effects/mmsg
 #    (mango's IPC syntax >= 0.14.0)
 if [[ -f "$WLOGOUT_LAYOUT" ]]; then
-    sed -i \
+    run_sed -i \
         -e 's/"action" : "hyprlock"/"action" : "swaylock -f"/' \
         -e 's/"action" : "hyprctl dispatch exit"/"action" : "mmsg dispatch quit"/' \
         "$WLOGOUT_LAYOUT"
@@ -753,7 +884,7 @@ fi
 #    kohagi_personal_configs/wlogout folder after it was renamed to
 #    config/wlogout). Normalize both regardless of which state it's in.
 if [[ -f "$WLOGOUT_THEME_SCRIPT" ]]; then
-    sed -i -E \
+    run_sed -i -E \
         -e 's#^BASE=".*/\.config/mango/(kohagi_personal_configs|config)/wlogout"#BASE="'"${CONFIG_DIR}"'/config/wlogout"#' \
         -e 's#^TARGET=".*/\.config/wlogout"#TARGET="'"${HOME}"'/.config/wlogout"#' \
         "$WLOGOUT_THEME_SCRIPT"
@@ -785,7 +916,7 @@ POLKITEOF
 
     WALLPAPER_FALLBACK="$(find "$CONFIG_DIR/config" "$CONFIG_DIR/wallpaper" -maxdepth 2 \( -iname 'wallpaper*.png' -o -iname 'wallpaper*.jpg' \) 2>/dev/null | head -1)"
     if grep -qx 'waypaper --restore &' "$AUTOSTART" && ! grep -q 'swaybg -i' "$AUTOSTART" && [[ -n "$WALLPAPER_FALLBACK" ]]; then
-        sed -i '/^waypaper --restore &$/c\
+        run_sed -i '/^waypaper --restore &$/c\
 if [ -f "$HOME/.config/waypaper/config.ini" ]; then\
     waypaper --restore \&\
 else\
@@ -797,14 +928,14 @@ fi' "$AUTOSTART"
     fi
 
     if [[ "$INIT_SYSTEM" == "systemd" ]]; then
-        sed -i 's/^dbus-update-activation-environment \\$/dbus-update-activation-environment --systemd \\/' "$AUTOSTART"
+        run_sed -i 's/^dbus-update-activation-environment \\$/dbus-update-activation-environment --systemd \\/' "$AUTOSTART"
         log_adapt "scripts/autostart.sh: added --systemd to dbus-update-activation-environment (you're on systemd, this also propagates the env vars to systemd --user)"
     fi
 fi
 
 # 5) volume.sh: the mute notification pointed at an icon that doesn't exist anywhere in the repo
 if [[ -f "$CONFIG_DIR/scripts/volume.sh" ]]; then
-    sed -i 's#\${HOME}/\.config/rice_assets/Icons/mute\.png#/usr/share/icons/Adwaita/96x96/status/audio-volume-muted-symbolic.symbolic.png#' "$CONFIG_DIR/scripts/volume.sh"
+    run_sed -i 's#\${HOME}/\.config/rice_assets/Icons/mute\.png#/usr/share/icons/Adwaita/96x96/status/audio-volume-muted-symbolic.symbolic.png#' "$CONFIG_DIR/scripts/volume.sh"
     log_adapt "scripts/volume.sh: fixed the mute icon path (the old one doesn't exist anywhere in the repo)"
 fi
 
@@ -851,8 +982,8 @@ done
 TAGSEOF
     chmod +x "$CONFIG_DIR/scripts/waybar-tags.sh"
 
-    sed -i 's/"dwl\/tags",/"custom\/tags",/' "$WAYBAR_JSONC"
-    sed -i '/"dwl\/tags": {/,/^    },/c\
+    run_sed -i 's/"dwl\/tags",/"custom\/tags",/' "$WAYBAR_JSONC"
+    run_sed -i '/"dwl\/tags": {/,/^    },/c\
     "custom/tags": {\
         "exec": "'"${CONFIG_DIR}"'/scripts/waybar-tags.sh",\
         "return-type": "json",\
@@ -864,7 +995,7 @@ fi
 # 7) config.conf: tag 1's tagrule is missing the "tagrule" prefix (a broken
 #    line that has no effect and could confuse the parser)
 if [[ -f "$CONFIG_DIR/config.conf" ]] && grep -qx '=id:1,layout_name:scroller' "$CONFIG_DIR/config.conf"; then
-    sed -i 's/^=id:1,layout_name:scroller$/#&  # broken line (missing the "tagrule" prefix) - commented out by install.sh/' "$CONFIG_DIR/config.conf"
+    run_sed -i 's/^=id:1,layout_name:scroller$/#&  # broken line (missing the "tagrule" prefix) - commented out by install.sh/' "$CONFIG_DIR/config.conf"
     log_adapt "config.conf: commented out the line '=id:1,layout_name:scroller' (missing the 'tagrule=' prefix, had no effect and could confuse the parser). If you actually wanted tag 1 on the scroller layout instead of tile, let me know and I'll fix it properly."
 fi
 
@@ -873,11 +1004,11 @@ fi
 #    config.conf's SUPER+A bind have gone back and forth between having these
 #    flags and not across repo edits — force them on in both places.
 if [[ -f "$AUTOSTART" ]] && grep -qx 'discord &' "$AUTOSTART"; then
-    sed -i 's/^discord &$/discord --enable-features=UseOzonePlatform,WebRTCPipeWireCapturer --ozone-platform=wayland \&/' "$AUTOSTART"
+    run_sed -i 's/^discord &$/discord --enable-features=UseOzonePlatform,WebRTCPipeWireCapturer --ozone-platform=wayland \&/' "$AUTOSTART"
     log_adapt "scripts/autostart.sh: discord now launches with --ozone-platform=wayland + WebRTCPipeWireCapturer (screen sharing silently breaks without these)"
 fi
 if [[ -f "$CONFIG_DIR/config.conf" ]] && grep -qx 'bind=SUPER,a,spawn,discord' "$CONFIG_DIR/config.conf"; then
-    sed -i 's/^bind=SUPER,a,spawn,discord$/bind=SUPER,a,spawn,discord --enable-features=UseOzonePlatform,WebRTCPipeWireCapturer --ozone-platform=wayland/' "$CONFIG_DIR/config.conf"
+    run_sed -i 's/^bind=SUPER,a,spawn,discord$/bind=SUPER,a,spawn,discord --enable-features=UseOzonePlatform,WebRTCPipeWireCapturer --ozone-platform=wayland/' "$CONFIG_DIR/config.conf"
     log_adapt "config.conf: SUPER+A now launches Discord with the same --ozone-platform=wayland/PipeWire flags, so screen sharing works no matter how you opened it"
 fi
 
@@ -900,7 +1031,7 @@ log_adapt "Added ~/.config/xdg-desktop-portal/portals.conf pinning ScreenCast/Sc
 #     but toggleoverview/killclient already have working keybinds elsewhere
 #     (ALT+Tab, SUPER+q), so these two lines are pure noise on every start.
 if [[ -f "$CONFIG_DIR/config.conf" ]] && grep -q '^mousebind=NONE,btn_\(left\|right\),' "$CONFIG_DIR/config.conf"; then
-    sed -i -E 's/^(mousebind=NONE,btn_(left|right),.*)$/# \1  # mango can'"'"'t bind btn_left\/btn_right with NONE - already bound to ALT+Tab \/ SUPER+q/' "$CONFIG_DIR/config.conf"
+    run_sed -i -E 's/^(mousebind=NONE,btn_(left|right),.*)$/# \1  # mango can'"'"'t bind btn_left\/btn_right with NONE - already bound to ALT+Tab \/ SUPER+q/' "$CONFIG_DIR/config.conf"
     log_adapt "config.conf: commented out mousebind=NONE,btn_left/btn_right (mango rejects NONE as a modifier for those two buttons — it's a known engine limitation, and both actions already have working keybinds: ALT+Tab and SUPER+q)"
 fi
 
@@ -920,7 +1051,7 @@ for d in /sys/class/hwmon/hwmon*; do
     esac
 done
 if [[ -n "$hwmon_path" && -f "$WAYBAR_JSONC" ]]; then
-    sed -i "s#/sys/class/hwmon/hwmon[0-9]*/temp1_input#${hwmon_path}#" "$WAYBAR_JSONC"
+    run_sed -i "s#/sys/class/hwmon/hwmon[0-9]*/temp1_input#${hwmon_path}#" "$WAYBAR_JSONC"
     ok "Sensor: $hwmon_path"
     log_adapt "waybar/config.jsonc: hwmon-path was hardcoded (hwmon4) -> auto-detected as $hwmon_path"
 else
@@ -986,44 +1117,8 @@ else
     fi
 fi
 
-# ---------- keyboard layout ----------
-step "Keyboard layout"
-echo "    1) us       — US"
-echo "    2) br       — Brazil (ABNT2)"
-echo "    3) br-intl  — Brazil (ABNT2, international/dead-key variant)"
-echo "    4) de       — Germany"
-echo "    5) fr       — France"
-echo "    6) es       — Spain"
-echo "    7) gb       — UK"
-echo "    8) it       — Italy"
-echo "    9) pt       — Portugal"
-echo "    10) other (type the code yourself)"
-kb_reply=""
-while [[ ! "$kb_reply" =~ ^([1-9]|10)$ ]]; do
-    read -rp "Pick your keyboard layout [1-10]: " kb_reply
-done
-KB_VARIANT=""
-case "$kb_reply" in
-    1)  KB_LAYOUT="us"; KB_CONSOLE="us" ;;
-    2)  KB_LAYOUT="br"; KB_CONSOLE="br-abnt2" ;;
-    3)  KB_LAYOUT="br"; KB_VARIANT="intl"; KB_CONSOLE="br-abnt2" ;;
-    4)  KB_LAYOUT="de"; KB_CONSOLE="de" ;;
-    5)  KB_LAYOUT="fr"; KB_CONSOLE="fr" ;;
-    6)  KB_LAYOUT="es"; KB_CONSOLE="es" ;;
-    7)  KB_LAYOUT="gb"; KB_CONSOLE="uk" ;;   # XKB calls it "gb", the console keymap is named "uk"
-    8)  KB_LAYOUT="it"; KB_CONSOLE="it" ;;
-    9)  KB_LAYOUT="pt"; KB_CONSOLE="pt-latin1" ;;
-    10)
-        read -rp "XKB layout code for config.conf (e.g. us, br, de — NOT 'br(intl)', see next question): " KB_LAYOUT
-        read -rp "Variant, if any (e.g. intl, nodeadkeys — leave empty for none): " KB_VARIANT
-        read -rp "Matching console keymap (e.g. us, br-abnt2 — leave empty to skip): " KB_CONSOLE
-        ;;
-esac
+# ---------- keyboard layout (asked earlier, applied now) ----------
 
-# Defensive: if someone typed setxkbmap-style "layout(variant)" in a custom
-# entry (e.g. "br(intl)"), split it instead of writing that literal string
-# into xkb_rules_layout — mango expects layout and variant as separate
-# fields, and xkbcommon fails to compile the keymap otherwise.
 if [[ "$KB_LAYOUT" =~ ^([a-zA-Z0-9_-]+)\(([a-zA-Z0-9_-]+)\)$ ]]; then
     KB_VARIANT="${BASH_REMATCH[2]}"
     KB_LAYOUT="${BASH_REMATCH[1]}"
@@ -1031,14 +1126,14 @@ fi
 
 if [[ -n "$KB_LAYOUT" && -f "$CONFIG_DIR/config.conf" ]]; then
     if grep -q '^xkb_rules_layout=' "$CONFIG_DIR/config.conf"; then
-        sed -i "s/^xkb_rules_layout=.*/xkb_rules_layout=${KB_LAYOUT}/" "$CONFIG_DIR/config.conf"
+        run_sed -i "s/^xkb_rules_layout=.*/xkb_rules_layout=${KB_LAYOUT}/" "$CONFIG_DIR/config.conf"
     else
-        printf '\n# keyboard layout (set by install.sh)\nxkb_rules_layout=%s\n' "$KB_LAYOUT" >> "$CONFIG_DIR/config.conf"
+        printf '\n# keyboard layout (set by install.sh)\nxkb_rules_layout=%s\n' "$KB_LAYOUT" | write_to_append "$CONFIG_DIR/config.conf"
     fi
     if grep -q '^xkb_rules_variant=' "$CONFIG_DIR/config.conf"; then
-        sed -i "s/^xkb_rules_variant=.*/xkb_rules_variant=${KB_VARIANT}/" "$CONFIG_DIR/config.conf"
+        run_sed -i "s/^xkb_rules_variant=.*/xkb_rules_variant=${KB_VARIANT}/" "$CONFIG_DIR/config.conf"
     elif [[ -n "$KB_VARIANT" ]]; then
-        sed -i "/^xkb_rules_layout=${KB_LAYOUT}$/a xkb_rules_variant=${KB_VARIANT}" "$CONFIG_DIR/config.conf"
+        run_sed -i "/^xkb_rules_layout=${KB_LAYOUT}$/a xkb_rules_variant=${KB_VARIANT}" "$CONFIG_DIR/config.conf"
     fi
     ok "config.conf: xkb_rules_layout=$KB_LAYOUT${KB_VARIANT:+, xkb_rules_variant=$KB_VARIANT}"
     log_adapt "config.conf: keyboard layout set to '$KB_LAYOUT'${KB_VARIANT:+ (variant: $KB_VARIANT)}"
@@ -1049,7 +1144,7 @@ if [[ -n "${KB_CONSOLE:-}" ]]; then
         info "NixOS manages the console keymap declaratively — add console.keyMap = \"$KB_CONSOLE\"; to your configuration.nix instead (it's in the snippet written earlier)."
     else
         if [[ -f /etc/vconsole.conf ]] && grep -q '^KEYMAP=' /etc/vconsole.conf; then
-            sudo sed -i "s/^KEYMAP=.*/KEYMAP=${KB_CONSOLE}/" /etc/vconsole.conf || true
+            run sudo sed -i "s/^KEYMAP=.*/KEYMAP=${KB_CONSOLE}/" /etc/vconsole.conf || true
         else
             printf 'KEYMAP=%s\n' "$KB_CONSOLE" | sudo tee -a /etc/vconsole.conf >/dev/null || true
         fi
@@ -1082,7 +1177,7 @@ gtk-cursor-theme-name="Animated-Mew-Cursor"
 gtk-cursor-theme-size=24
 GTK2EOF
 if [[ -f "$AUTOSTART" ]] && ! grep -q "GTK_THEME" "$AUTOSTART"; then
-    sed -i '/^export XCURSOR_THEME=/i export GTK_THEME=Materia-dark:dark' "$AUTOSTART"
+    run_sed -i '/^export XCURSOR_THEME=/i export GTK_THEME=Materia-dark:dark' "$AUTOSTART"
 fi
 ok "gtk-3.0/gtk-4.0 settings.ini and ~/.gtkrc-2.0 written"
 log_adapt "GTK theme: applied Materia-dark the same way nwg-look would (gtk-3.0/gtk-4.0 settings.ini + ~/.gtkrc-2.0 + GTK_THEME env var), together with the Animated-Mew-Cursor cursor"
