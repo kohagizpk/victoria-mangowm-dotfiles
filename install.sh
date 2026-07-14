@@ -25,9 +25,8 @@ c_red='\033[38;2;243;139;168m';   c_blue='\033[38;2;137;180;250m'
 c_sub='\033[38;2;108;112;134m'
 
 STEP_NUM=0
-TOTAL_STEPS="$(grep -c '^step "' "${BASH_SOURCE[0]}" 2>/dev/null || echo '?')"
 
-step()  { STEP_NUM=$((STEP_NUM + 1)); printf "\n${c_mauve}❯${c_reset} ${c_sub}[%s/%s]${c_reset} ${c_bold}%s${c_reset}\n" "$STEP_NUM" "$TOTAL_STEPS" "$1"; }
+step()  { STEP_NUM=$((STEP_NUM + 1)); printf "\n${c_mauve}❯${c_reset} ${c_sub}[%s]${c_reset} ${c_bold}%s${c_reset}\n" "$STEP_NUM" "$1"; }
 info()  { printf "  ${c_sub}·${c_reset} %s\n" "$1"; }
 ok()    { printf "  ${c_green}✓${c_reset} %s\n" "$1"; }
 warn()  { printf "  ${c_yellow}!${c_reset} %s\n" "$1"; }
@@ -213,6 +212,80 @@ info "Distro family: $DISTRO_FAMILY"
 info "Init system: $INIT_SYSTEM"
 if ! confirm "Start?"; then
     exit 0
+fi
+
+# Ask for the sudo password once up front instead of ~20 separate times
+# throughout the script. sudo caches it for a while (usually 15 min); a
+# background loop keeps it refreshed for the rest of the run.
+sudo -v
+( while true; do sudo -n true; sleep 60; kill -0 "$$" 2>/dev/null || exit; done ) 2>/dev/null &
+SUDO_KEEPALIVE_PID=$!
+trap 'kill "$SUDO_KEEPALIVE_PID" 2>/dev/null' EXIT
+
+if [[ "$DISTRO_FAMILY" == "arch" ]]; then
+    step "Syncing package databases"
+    sudo pacman -Sy
+fi
+
+# ---------- Arch's own repos, on Arch-based (non-Arch) distros ----------
+# CachyOS, EndeavourOS etc. already ship Arch's [core]/[extra] repos, so this
+# is a no-op there — this only ever actually does something on distros like
+# Artix that deliberately don't include them by default.
+if [[ "$DISTRO_FAMILY" == "arch" ]] && ! grep -qE '^\[(core|extra)\]' /etc/pacman.conf 2>/dev/null; then
+    step "Arch's official repos"
+    DISTRO_PRETTY="$(. /etc/os-release 2>/dev/null; echo "${PRETTY_NAME:-your distro}")"
+    info "$DISTRO_PRETTY doesn't have Arch's own [core]/[extra] repos enabled."
+    info "Some AUR packages depend on things only published there (this is the standard artix-archlinux-support approach)."
+    if confirm "Add them now, with a mirrorlist matched to your region?"; then
+        sudo pacman -S --needed --noconfirm artix-archlinux-support 2>/dev/null || true
+        sudo pacman-key --populate archlinux 2>/dev/null || true
+
+        # Try to reuse whatever region your existing mirrors are already in,
+        # by reading the "## CountryName" comment above them (the same
+        # convention Arch's, Artix's, and reflector-generated mirrorlists
+        # all use) — fall back to a quick IP geolocation lookup.
+        REGION=""
+        for ml in /etc/pacman.d/mirrorlist /etc/pacman.d/*mirrorlist*; do
+            [[ -f "$ml" ]] || continue
+            REGION="$(grep -m1 -oE '^## +[A-Za-z ]+$' "$ml" 2>/dev/null | sed 's/^## *//')"
+            [[ -n "$REGION" ]] && break
+        done
+        if [[ -z "$REGION" ]]; then
+            REGION="$(curl -fsSL --max-time 3 https://ipapi.co/country_name/ 2>/dev/null || true)"
+        fi
+
+        if command -v reflector >/dev/null 2>&1 || sudo pacman -S --needed --noconfirm reflector 2>/dev/null; then
+            if [[ -n "$REGION" ]]; then
+                if sudo reflector --country "$REGION" --protocol https --latest 10 --sort rate --save /etc/pacman.d/mirrorlist-arch 2>/dev/null; then
+                    ok "Arch mirrorlist generated for: $REGION"
+                else
+                    warn "No Arch mirrors found for '$REGION' specifically — grabbing the fastest ones worldwide instead."
+                    sudo reflector --latest 15 --protocol https --sort rate --save /etc/pacman.d/mirrorlist-arch 2>/dev/null || true
+                fi
+            else
+                sudo reflector --latest 15 --protocol https --sort rate --save /etc/pacman.d/mirrorlist-arch 2>/dev/null || true
+                ok "Arch mirrorlist generated (fastest available; couldn't work out a region)"
+            fi
+        else
+            warn "reflector isn't available — using the default mirrorlist-arch from artix-archlinux-support as-is (still works, just not latency-sorted)."
+        fi
+
+        if [[ -f /etc/pacman.d/mirrorlist-arch ]] && ! grep -q 'mirrorlist-arch' /etc/pacman.conf; then
+            sudo tee -a /etc/pacman.conf >/dev/null <<'PACMANEOF'
+
+[core]
+Include = /etc/pacman.d/mirrorlist-arch
+
+[extra]
+Include = /etc/pacman.d/mirrorlist-arch
+PACMANEOF
+            sudo pacman -Sy
+            ok "Arch's [core] and [extra] repos added to /etc/pacman.conf"
+            log_adapt "Added Arch's official [core]/[extra] repos as extra pacman sources (via artix-archlinux-support), with a mirrorlist matched to $([[ -n "$REGION" ]] && echo "$REGION" || echo "the fastest available mirrors") — some AUR/community packages depend on things only published there"
+        else
+            warn "Couldn't confirm mirrorlist-arch was created — skipping the pacman.conf edit. Packages needing Arch's repos may still fail; check https://wiki.artixlinux.org manually."
+        fi
+    fi
 fi
 
 # ---------- systemd-libs dummy (Artix) ----------
@@ -553,7 +626,7 @@ LYEOF
 
     step "Discord & Spotify (Flatpak)"
     info "Fedora's repos don't carry Discord/Spotify; the repo's autostart.sh and keybinds expect the 'discord' and 'spotify' commands."
-    if command -v flatpak >/dev/null 2>&1 || confirm "Install Flatpak, then Discord and Spotify through it?"; then
+    if confirm "Install Discord and Spotify through Flatpak?"; then
         command -v flatpak >/dev/null 2>&1 || sudo dnf install -y flatpak
         flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
         flatpak install -y flathub com.discordapp.Discord com.spotify.Client || true
@@ -628,6 +701,7 @@ fi
 if [[ "$IN_PLACE" -eq 1 ]]; then
     step "Using $CONFIG_DIR in place"
     info "No copy needed, the checkout at $SOURCE_DIR already is $CONFIG_DIR."
+    info "Leaving .git and install.sh alone here — this IS your actual clone, not a throwaway copy."
 else
     step "Copying dotfiles to $CONFIG_DIR"
     if [[ -d "$CONFIG_DIR" ]]; then
@@ -642,9 +716,9 @@ else
     fi
     mkdir -p "$CONFIG_DIR"
     cp -a "$SOURCE_DIR/." "$CONFIG_DIR/"
+    rm -rf "$CONFIG_DIR/.git" "$CONFIG_DIR/install.sh"
     ok "Copied"
 fi
-rm -rf "$CONFIG_DIR/.git" "$CONFIG_DIR/install.sh"
 
 # ---------- corrections ----------
 step "Applying corrections"
@@ -971,18 +1045,22 @@ if [[ -n "$KB_LAYOUT" && -f "$CONFIG_DIR/config.conf" ]]; then
 fi
 
 if [[ -n "${KB_CONSOLE:-}" ]]; then
-    if [[ -f /etc/vconsole.conf ]] && grep -q '^KEYMAP=' /etc/vconsole.conf; then
-        sudo sed -i "s/^KEYMAP=.*/KEYMAP=${KB_CONSOLE}/" /etc/vconsole.conf
+    if [[ "$DISTRO_FAMILY" == "nixos" ]]; then
+        info "NixOS manages the console keymap declaratively — add console.keyMap = \"$KB_CONSOLE\"; to your configuration.nix instead (it's in the snippet written earlier)."
     else
-        printf 'KEYMAP=%s\n' "$KB_CONSOLE" | sudo tee -a /etc/vconsole.conf >/dev/null
+        if [[ -f /etc/vconsole.conf ]] && grep -q '^KEYMAP=' /etc/vconsole.conf; then
+            sudo sed -i "s/^KEYMAP=.*/KEYMAP=${KB_CONSOLE}/" /etc/vconsole.conf || true
+        else
+            printf 'KEYMAP=%s\n' "$KB_CONSOLE" | sudo tee -a /etc/vconsole.conf >/dev/null || true
+        fi
+        if [[ "$INIT_SYSTEM" == "systemd" ]]; then
+            sudo localectl set-keymap "$KB_CONSOLE" 2>/dev/null || true
+        else
+            sudo loadkeys "$KB_CONSOLE" 2>/dev/null || true
+        fi
+        ok "Console/TTY keymap: $KB_CONSOLE (/etc/vconsole.conf)"
+        log_adapt "Console keymap set to $KB_CONSOLE, matching the $KB_LAYOUT layout in config.conf — so a bare TTY and the shell before mango even starts use the same layout, not just the graphical session"
     fi
-    if [[ "$INIT_SYSTEM" == "systemd" ]]; then
-        sudo localectl set-keymap "$KB_CONSOLE" 2>/dev/null || true
-    else
-        sudo loadkeys "$KB_CONSOLE" 2>/dev/null || true
-    fi
-    ok "Console/TTY keymap: $KB_CONSOLE (/etc/vconsole.conf)"
-    log_adapt "Console keymap set to $KB_CONSOLE, matching the $KB_LAYOUT layout in config.conf — so a bare TTY and the shell before mango even starts use the same layout, not just the graphical session"
 fi
 
 
@@ -1178,14 +1256,20 @@ check_file() {
         HEALTH_OK=0
     fi
 }
-check_cmd mango
-check_cmd waybar
-check_cmd kitty
-check_cmd fish
-check_cmd mmsg
-check_file "$CONFIG_DIR/config.conf" "config.conf deployed"
-check_file "$HOME/.config/wlogout/layout" "wlogout theme deployed"
-check_file "$HOME/.local/share/icons/Animated-Mew-Cursor" "cursor theme installed"
+if [[ "$DISTRO_FAMILY" == "nixos" ]]; then
+    info "Skipping the command checks — on NixOS nothing gets installed until you rebuild with the snippet from earlier, so 'not found' here would just be expected, not a real problem."
+    check_file "$CONFIG_DIR/config.conf" "config.conf deployed"
+    check_file "$HOME/.config/wlogout/layout" "wlogout theme deployed"
+else
+    check_cmd mango
+    check_cmd waybar
+    check_cmd kitty
+    check_cmd fish
+    check_cmd mmsg
+    check_file "$CONFIG_DIR/config.conf" "config.conf deployed"
+    check_file "$HOME/.config/wlogout/layout" "wlogout theme deployed"
+    check_file "$HOME/.local/share/icons/Animated-Mew-Cursor" "cursor theme installed"
+fi
 if [[ "$HEALTH_OK" -eq 1 ]]; then
     ok "Everything checks out"
 else

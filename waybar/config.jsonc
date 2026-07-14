@@ -90,7 +90,7 @@
     "pulseaudio#audio": {
         "format": "{icon} {volume}%",
         "tooltip": false,
-        "format-muted": "󰝟 Mudo",
+        "format-muted": "󰝟 Muted",
         "on-click": "wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle",
         "on-scroll-up": "wpctl set-volume -l 1.0 @DEFAULT_AUDIO_SINK@ 2%+",
         "on-scroll-down": "wpctl set-volume -l 1.0 @DEFAULT_AUDIO_SINK@ 2%-",
