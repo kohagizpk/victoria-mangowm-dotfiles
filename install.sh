@@ -961,63 +961,24 @@ fi
 #    there's no reliable way from here to confirm the installed waybar
 #    build is new enough for mango/workspaces without risking a working
 #    setup to find out.
-mkdir -p "$CONFIG_DIR/scripts"
-cat > "$CONFIG_DIR/scripts/waybar-tags.sh" <<'TAGSEOF'
-#!/bin/bash
-# Fallback custom/tags module for waybar, reads mmsg directly (mango >= 0.14.0).
-# Use this if mango/workspaces isn't recognized by your waybar build (it
-# needs a very recent one). In waybar/config.jsonc:
-#   1) in "modules-left", change "mango/workspaces" to "custom/tags"
-#   2) replace the "mango/workspaces": {...} block with:
-#        "custom/tags": {
-#            "exec": "~/.config/mango/scripts/waybar-tags.sh",
-#            "return-type": "json",
-#            "restart-interval": 0
-#        }
-#      (use the real absolute path instead of ~ — it doesn't reliably
-#      expand in waybar's exec)
-# Format of "mmsg get all-tags" / "mmsg watch all-tags":
-# {"all_tags":[{"monitor":"eDP-1","tags":[{"index":1,"is_active":bool,"is_urgent":bool,"client_count":n}, ...]}]}
-
-# MANGO_INSTANCE_SIGNATURE sometimes isn't inherited from the parent process
-# (seen on -git builds). If it's missing, find the socket ourselves.
-if [[ -z "${MANGO_INSTANCE_SIGNATURE:-}" ]]; then
-    sig="$(find "${XDG_RUNTIME_DIR:-/run/user/$(id -u)}" /tmp -maxdepth 2 -type s -iname '*mango*' 2>/dev/null | head -1)"
-    [[ -n "$sig" ]] && export MANGO_INSTANCE_SIGNATURE="$sig"
-fi
-
-render() {
-    jq -c '
-        .all_tags[0].tags as $tags
-        | ($tags | map(
-            if .is_urgent then
-                "<span foreground=\"#f38ba8\"><b>" + (.index|tostring) + "</b></span>"
-            elif .is_active then
-                "<span foreground=\"#cba6f7\"><b>[" + (.index|tostring) + "]</b></span>"
-            elif .client_count > 0 then
-                (.index|tostring)
-            else
-                empty
-            end
-          ) | join(" ")) as $out
-        | {text: $out, tooltip: "mango tags"}
-    '
-}
-
-mmsg get all-tags | render
-mmsg watch all-tags | while IFS= read -r line; do
-    [[ -n "$line" ]] && printf '%s\n' "$line" | render
-done
-TAGSEOF
-chmod +x "$CONFIG_DIR/scripts/waybar-tags.sh"
-
+# 6) waybar tags/workspaces module. Waybar's own compatibility table lists
+#    full native support for Mango (workspaces, window, layout, language,
+#    mode) via "mango/*" modules talking straight to mango's socket — and
+#    unlike a custom script, the native module correctly shows each
+#    monitor's own tags in a multi-monitor setup instead of always reading
+#    monitor 1. dwl/tags and dwl/window both use the dwl-ipc protocol mango
+#    has deprecated, so upgrade those specifically. If the config already
+#    uses ext/workspaces, leave it — it might already be working, and
+#    there's no reliable way from here to confirm the installed waybar
+#    build is new enough for mango/workspaces without risking a working
+#    setup to find out.
 if [[ -f "$WAYBAR_JSONC" ]] && grep -q '"dwl/tags"' "$WAYBAR_JSONC"; then
     run_sed -i 's/"dwl\/tags",/"mango\/workspaces",/' "$WAYBAR_JSONC"
     run_sed -i '/"dwl\/tags": {/,/^    },/c\
     "mango/workspaces": {\
         "format": "{name}"\
     },' "$WAYBAR_JSONC"
-    log_adapt "waybar/config.jsonc: dwl/tags -> mango/workspaces (dwl-ipc is deprecated in mango; the native mango/workspaces module also shows each monitor's own tags correctly, which a custom script reading all_tags[0] can't). If it renders blank, your waybar build may be too old for it — a working fallback script is at scripts/waybar-tags.sh, see the comment at its top for how to swap it in (module: custom/tags)"
+    log_adapt "waybar/config.jsonc: dwl/tags -> mango/workspaces (dwl-ipc is deprecated in mango; the native mango/workspaces module also shows each monitor's own tags correctly, which a custom script reading all_tags[0] can't)"
 fi
 
 if [[ -f "$WAYBAR_JSONC" ]] && grep -q '"dwl/window"' "$WAYBAR_JSONC"; then
