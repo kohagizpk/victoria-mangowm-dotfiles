@@ -1,8 +1,4 @@
 #!/bin/bash
-# Wrapper pra subir o waybar mostrando o módulo "battery" só quando o
-# sistema tiver bateria de verdade (notebook). Em desktop (sem BAT*),
-# sobe sem o módulo, sem o famoso espacinho vazio de 1px que o waybar
-# deixa quando não acha bateria.
 
 CONFIG_SRC="$HOME/.config/mango/waybar/config.jsonc"
 STYLE_SRC="$HOME/.config/mango/waybar/style.css"

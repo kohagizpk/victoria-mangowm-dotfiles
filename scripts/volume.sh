@@ -1,11 +1,5 @@
 #!/usr/bin/bash
 
-# Changes de volume of the default sink
-# Warning: This script offers no cap for volume, 
-# I'd advice to not go above 150% (which is the standard cap).
-# You can call this script like this:
-# volume.sh [up|down|mute]
-
 function get_volume {
 	pactl get-sink-volume @DEFAULT_SINK@ | awk '{printf $5}' | cut -d '%' -f 1
 }
@@ -34,9 +28,7 @@ function send_notification {
         else
             icon_name="${HOME}/.config/rice_assets/Icons/vthigh.png"
     fi;
-    #bn=$(( (volume + 5) / 5 ))
-                                                                                                                                                                    
-    #bar=$(seq -s "" $bn | sed 's/[0-9]//g')          
+    
                                                                                                          
     # Send the notification                                                      
     dunstify "Volume: $overvolume%" -h int:value:$volume -i /usr/share/icons/Adwaita/96x96/status/audio-volume-medium-symbolic.symbolic.png  -t 1000 --replace=555 -u normal
@@ -45,23 +37,9 @@ function send_notification {
 case $1 in
     up)
 		swayosd-client --output-volume 5
-	    # # Set the volume on (if it was muted)
-	    # pactl set-sink-mute @DEFAULT_SINK@ 0 > /dev/null
-	    # # Up the volume (+ 5%)
-    	# curvol=`get_volume`
-    	# rem=$(( (curvol + 5) % 5 ))
-    	# inc="+$(( 5 - rem ))%"
-    	# pactl set-sink-volume @DEFAULT_SINK@ $inc > /dev/null
-	    # send_notification
 	;;
     down)
 		swayosd-client --output-volume -5
-	    # pactl set-sink-mute @DEFAULT_SINK@ 0 > /dev/null
-	    # curvol=`get_volume`
-    	# rem=$(( (curvol - 5) % 5 ))
-    	# inc="-$(( 5 + rem ))%"
-	    # pactl set-sink-volume @DEFAULT_SINK@ $inc > /dev/null
-	    # send_notification
 	;;
     mute)
     	# Toggle mute

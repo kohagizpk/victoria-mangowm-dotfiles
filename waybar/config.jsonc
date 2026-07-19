@@ -117,10 +117,6 @@
         "tooltip": false
     },
     
-    // dwl/window -> mango/window: o dwl-ipc foi descontinuado no mango, o próprio
-    // changelog pede pra trocar o prefixo. OBS: este bloco não está em nenhum
-    // modules-left/center/right hoje, então o título da janela já não aparecia
-    // na barra antes disso também — deixei do jeito que estava, só corrigido.
     "mango/window": {
         "format": "{title}",
         "max-length": 30,

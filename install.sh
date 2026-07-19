@@ -37,8 +37,44 @@ c_red='\033[38;2;243;139;168m';   c_blue='\033[38;2;137;180;250m'
 c_sub='\033[38;2;108;112;134m'
 
 STEP_NUM=0
+WATERMARK_ACTIVE=0
+WATERMARK_LINES=3
 
-step()  { STEP_NUM=$((STEP_NUM + 1)); printf "\n${c_mauve}❯${c_reset} ${c_sub}[%s]${c_reset} ${c_bold}%s${c_reset}\n" "$STEP_NUM" "$1"; }
+# Pins a compact version of the banner to the top of the terminal using a
+# DECSTBM scroll region, so it stays put while everything else scrolls
+# underneath it — like archinstall's persistent header. Degrades silently
+# to plain output (no pinning) on anything that isn't a real, big-enough
+# interactive terminal.
+draw_watermark() {
+    [[ "$WATERMARK_ACTIVE" -eq 1 ]] || return 0
+    tput sc 2>/dev/null
+    tput cup 0 0 2>/dev/null || { tput rc 2>/dev/null; return 0; }
+    printf "${c_mauve}${c_bold}  VICTORIA${c_reset} ${c_sub}· mango window manager · victoria-mangowm-dotfiles${c_reset}"; tput el 2>/dev/null
+    printf '\n'; tput el 2>/dev/null
+    printf "${c_mauve}  ──────────────────────────────────────────────────────────────────${c_reset}"; tput el 2>/dev/null
+    tput rc 2>/dev/null
+}
+
+setup_watermark() {
+    [[ -t 1 && -t 0 ]] || return 0
+    command -v tput >/dev/null 2>&1 || return 0
+    local lines
+    lines="$(tput lines 2>/dev/null)" || return 0
+    [[ "$lines" =~ ^[0-9]+$ && "$lines" -gt $((WATERMARK_LINES + 10)) ]] || return 0
+    printf '\033[%d;%dr' "$((WATERMARK_LINES + 1))" "$lines" 2>/dev/null || return 0
+    tput cup "$WATERMARK_LINES" 0 2>/dev/null
+    WATERMARK_ACTIVE=1
+    draw_watermark
+}
+
+reset_watermark() {
+    [[ "$WATERMARK_ACTIVE" -eq 1 ]] || return 0
+    printf '\033[r'
+    tput cup "$(tput lines 2>/dev/null || echo 24)" 0 2>/dev/null
+    WATERMARK_ACTIVE=0
+}
+
+step()  { STEP_NUM=$((STEP_NUM + 1)); draw_watermark; printf "\n${c_mauve}❯${c_reset} ${c_sub}[%s]${c_reset} ${c_bold}%s${c_reset}\n" "$STEP_NUM" "$1"; }
 info()  { printf "  ${c_sub}·${c_reset} %s\n" "$1"; }
 ok()    { printf "  ${c_green}✓${c_reset} %s\n" "$1"; }
 warn()  { printf "  ${c_yellow}!${c_reset} %s\n" "$1"; }
@@ -149,7 +185,15 @@ on_error() {
 }
 trap 'on_error $LINENO' ERR
 
+SUDO_KEEPALIVE_PID=""
+cleanup_on_exit() {
+    [[ -n "$SUDO_KEEPALIVE_PID" ]] && kill "$SUDO_KEEPALIVE_PID" 2>/dev/null
+    reset_watermark
+}
+trap cleanup_on_exit EXIT
+
 banner
+setup_watermark
 
 # Moves aside every session entry except mango.desktop, so display managers
 # (ly) only ever list Mango. Reversible: nothing is deleted, just moved.
@@ -326,7 +370,6 @@ if [[ "$DRY_RUN" -eq 0 ]]; then
     if sudo -n true 2>/dev/null; then
         ( while true; do sleep 30; sudo -n true 2>/dev/null || exit; kill -0 "$$" 2>/dev/null || exit; done ) 2>/dev/null &
         SUDO_KEEPALIVE_PID=$!
-        trap 'kill "$SUDO_KEEPALIVE_PID" 2>/dev/null' EXIT
     else
         warn "sudo isn't caching credentials on this system (some hardened setups disable that) — you'll be asked for your password a few more times as the script runs. That's normal, not a hang."
     fi
@@ -1059,13 +1102,24 @@ if [[ -f "$CONFIG_DIR/scripts/print.sh" ]] && ! head -1 "$CONFIG_DIR/scripts/pri
 fi
 
 # 13) autostart.sh: kanshi isn't installed anymore — monitor layout is now
-#     handled natively by mango's own monitorrule= in config.conf (see the
-#     "Monitor detection" step below), so this line would just be a
-#     harmless "command not found" at best. Comment it out instead of
-#     leaving that in every boot log.
+#     handled by the repo's own scripts/auto-monitors.sh (native mango
+#     monitorrule=, driven by mmsg, with hotplug support), so this line
+#     would just be a harmless "command not found" at best. Comment it out
+#     instead of leaving that in every boot log.
 if [[ -f "$AUTOSTART" ]] && grep -qx 'kanshi &' "$AUTOSTART"; then
-    run_sed -i 's/^kanshi &$/# kanshi & # replaced by monitorrule= in config.conf, see install.sh/' "$AUTOSTART"
-    log_adapt "scripts/autostart.sh: commented out 'kanshi &' — monitor layout now lives in config.conf via mango's native monitorrule=, kanshi isn't installed by this script anymore"
+    run_sed -i 's/^kanshi &$/# kanshi & # replaced by scripts\/auto-monitors.sh, see install.sh/' "$AUTOSTART"
+    log_adapt "scripts/autostart.sh: commented out 'kanshi &' — monitor layout is handled by scripts/auto-monitors.sh now, kanshi isn't installed by this script anymore"
+fi
+
+# 14) config.conf: two binds use a comma between SUPER and SHIFT
+#     (bind=SUPER,SHIFT,Left,...) instead of a +. mango's own docs are
+#     explicit that comma separates bind FIELDS (mod,key,dispatcher,args)
+#     while + combines modifiers WITHIN one field — every other multi-mod
+#     bind in this file correctly uses +, only these two don't, so they
+#     likely don't bind what they're supposed to.
+if [[ -f "$CONFIG_DIR/config.conf" ]] && grep -qE '^bind=SUPER,SHIFT,(Left|Right),' "$CONFIG_DIR/config.conf"; then
+    run_sed -i -E 's/^bind=SUPER,SHIFT,(Left|Right),/bind=SUPER+SHIFT,\1,/' "$CONFIG_DIR/config.conf"
+    log_adapt "config.conf: bind=SUPER,SHIFT,Left/Right -> bind=SUPER+SHIFT,Left/Right (comma between modifiers is a field separator in mango's syntax, not a way to combine them — this matches every other multi-modifier bind already in the file)"
 fi
 
 

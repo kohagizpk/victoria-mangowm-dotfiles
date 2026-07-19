@@ -1,21 +1,4 @@
 #!/usr/bin/env bash
-# auto-monitors.sh — detecta os monitores conectados (via mmsg, o IPC do
-# próprio mango) e escreve monitorrule= no config.conf estendendo eles lado
-# a lado, depois manda o mango recarregar.
-#
-# kanshi e wlr-randr NÃO funcionam no mango: o compositor não implementa o
-# protocolo wlr-output-management-unstable-v1 que os dois precisam pra
-# aplicar mudança de saída. Isso substitui o "kanshi &" do autostart.sh.
-#
-# uso:
-#   auto-monitors.sh            detecta, aplica uma vez e sai
-#   auto-monitors.sh --watch    aplica e fica rodando, reaplicando a cada
-#                                plug/unplug (roda em background no autostart)
-#
-# ordem: por padrão ordena as saídas por nome (ex: DP-1 antes de HDMI-A-1).
-# se a ordem física não bater com o que você quer, defina MONITOR_ORDER
-# com os nomes na ordem esquerda->direita, ex:
-#   MONITOR_ORDER="HDMI-A-1 DP-1" ~/.config/mango/scripts/auto-monitors.sh
 
 set -euo pipefail
 
