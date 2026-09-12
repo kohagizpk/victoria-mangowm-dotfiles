@@ -503,8 +503,16 @@ PACKAGES=(
     # file manager & misc GUI utilities
     nemo pavucontrol nwg-look
 
-    # wallpaper, multi-monitor
-    swaybg waypaper
+    # wallpaper (awww, formerly swww, is the actual backend waypaper/wallust
+    # drive here — see scripts/wallust-reload.sh), multi-monitor
+    awww waypaper
+
+    # wallpaper-driven color scheme (wallust) + the two things it re-colors
+    wallust cava
+
+    # Spotify theming (needs a one-time manual "spicetify backup apply"
+    # after first login — see the summary at the end)
+    spicetify-cli
 
     # screenshots
     grim slurp
@@ -531,6 +539,9 @@ PACKAGES=(
 
     # GTK theming (materia-dark, applied like nwg-look would)
     materia-gtk-theme
+
+    # Qt theming (Ark, qBittorrent, etc. don't read the GTK theme at all)
+    qt5ct qt6ct adwaita-qt5 adwaita-qt6
 
     # audio
     pipewire pipewire-pulse pipewire-alsa wireplumber
@@ -697,7 +708,7 @@ if [[ "$DISTRO_FAMILY" == "fedora" ]]; then
         mangowm
         waybar rofi fuzzel foot kitty fish fastfetch
         nemo pavucontrol nwg-look
-        swaybg waypaper
+        awww waypaper cava
         grim slurp
         dunst swaync libnotify
         swayosd brightnessctl pamixer swayidle
@@ -758,6 +769,9 @@ if [[ "$DISTRO_FAMILY" == "fedora" ]]; then
 
     step "materia-gtk-theme"
     run sudo dnf install -y materia-gtk-theme 2>/dev/null || warn "materia-gtk-theme isn't in Fedora's repos on this release; the GTK settings below will still point to it, install it manually (e.g. from a COPR) if it doesn't show up."
+    for pkg in qt5ct qt6ct; do
+        run sudo dnf install -y "$pkg" || warn "$pkg not found — Qt apps (Ark, qBittorrent) may need it for dark theming to fully work, install by hand if QT_QPA_PLATFORMTHEME=gtk3 alone doesn't do it."
+    done
 
     step "cliphist, wl-clipboard, wl-clip-persist, xfce-polkit, wmenu"
     for pkg in cliphist wl-clipboard wl-clip-persist xfce4-polkit wmenu; do
@@ -817,6 +831,7 @@ LYEOF
     fi
 
     warn "helium-browser has no Fedora package; the repo's helium-browser keybind/autostart line will do nothing until you install it manually or swap it for another browser."
+    warn "wallust and spicetify-cli don't have Fedora packages either — the wallpaper-driven color scheme and Spotify theming won't be set up here. Install them via cargo/pip if you want them (cargo install wallust; spicetify's own install.sh)."
 fi
 
 # ---------- packages: NixOS ----------
@@ -850,7 +865,8 @@ if [[ "$DISTRO_FAMILY" == "nixos" ]]; then
   environment.systemPackages = with pkgs; [
     waybar rofi fuzzel foot kitty fish fastfetch
     nemo pavucontrol nwg-look
-    swaybg waypaper
+    awww waypaper
+    wallust cava
     grim slurp
     dunst swaync libnotify
     swayosd brightnessctl pamixer swayidle swaylock-effects
@@ -860,8 +876,9 @@ if [[ "$DISTRO_FAMILY" == "nixos" ]]; then
     jetbrains-mono
     noto-fonts-emoji
     materia-theme
+    libsForQt5.qt5ct qt6Packages.qt6ct
     pipewire wireplumber
-    discord spotify
+    discord spotify spicetify-cli
     wget jq
   ];
 }
@@ -924,14 +941,10 @@ if [[ -f "$WLOGOUT_LAYOUT" ]]; then
     log_adapt "config/wlogout/layout: hyprlock -> swaylock -f, hyprctl dispatch exit -> mmsg dispatch quit (those were Hyprland commands, not mango's; mmsg syntax updated for >= 0.14.0)"
 fi
 
-# 3) wlogout-theme.sh: BASE/TARGET have gone through several broken states
-#    across repo edits (a quoted "~", which bash never expands; a hardcoded
-#    /home/julia; and, most recently, still pointing at the old
-#    kohagi_personal_configs/wlogout folder after it was renamed to
-#    config/wlogout). Normalize both regardless of which state it's in —
-#    kept around because the power button in waybar calls it on click — but
-#    don't depend on running it successfully: copy the theme straight from
-#    the repo to ~/.config/wlogout ourselves too, right now.
+# 3) wlogout-theme.sh no longer exists in the repo — the power button in
+#    waybar calls "wlogout" directly now instead of going through it. Kept
+#    here (gated on the file existing) in case an older checkout or a fork
+#    still has it, normalizing whichever broken path state it's in.
 if [[ -f "$WLOGOUT_THEME_SCRIPT" ]]; then
     run_sed -i -E \
         -e 's#^BASE=".*/\.config/mango/(kohagi_personal_configs|config)/wlogout"#BASE="'"${CONFIG_DIR}"'/config/wlogout"#' \
@@ -943,8 +956,7 @@ fi
 if [[ -d "$CONFIG_DIR/config/wlogout" ]]; then
     mkdir -p "$HOME/.config/wlogout"
     cp "$CONFIG_DIR/config/wlogout/"* "$HOME/.config/wlogout/" 2>/dev/null || true
-    ok "~/.config/wlogout populated directly from the repo (not via wlogout-theme.sh)"
-    log_adapt "Copied config/wlogout/* straight to ~/.config/wlogout ourselves instead of depending on wlogout-theme.sh running correctly — that script is still there for the power button's on-click convenience (theme refresh + relaunch), but the initial deployment no longer needs it to succeed"
+    ok "~/.config/wlogout populated directly from the repo"
 fi
 
 # 4) autostart.sh: swayosd-server and the polkit agent don't start on their own
@@ -969,16 +981,16 @@ POLKITEOF
     fi
 
     WALLPAPER_FALLBACK="$(find "$CONFIG_DIR/config" "$CONFIG_DIR/wallpaper" -maxdepth 2 \( -iname 'wallpaper*.png' -o -iname 'wallpaper*.jpg' \) 2>/dev/null | head -1)"
-    if grep -qx 'waypaper --restore &' "$AUTOSTART" && ! grep -q 'swaybg -i' "$AUTOSTART" && [[ -n "$WALLPAPER_FALLBACK" ]]; then
+    if grep -qx 'waypaper --restore &' "$AUTOSTART" && ! grep -q 'awww img' "$AUTOSTART" && [[ -n "$WALLPAPER_FALLBACK" ]]; then
         run_sed -i '/^waypaper --restore &$/c\
 if [ -f "$HOME/.config/waypaper/config.ini" ]; then\
     waypaper --restore \&\
 else\
-    swaybg -i "'"${WALLPAPER_FALLBACK}"'" \&\
+    awww img "'"${WALLPAPER_FALLBACK}"'" \&\
 fi' "$AUTOSTART"
-        log_adapt "scripts/autostart.sh: waypaper --restore does nothing on a fresh install (no saved state yet) -> falls back to swaybg with a bundled wallpaper so you get one immediately"
+        log_adapt "scripts/autostart.sh: waypaper --restore does nothing on a fresh install (no saved state yet) -> falls back to 'awww img' with a bundled wallpaper so you get one immediately (swaybg isn't the backend here anymore, awww is)"
     elif [[ -z "$WALLPAPER_FALLBACK" ]]; then
-        info "No wallpaper image bundled in the repo right now, so no swaybg fallback was set up — the desktop will have no wallpaper until you pick one with SUPER+F (waypaper)."
+        info "No wallpaper image bundled in the repo right now, so no fallback was set up — the desktop will have no wallpaper until you pick one with SUPER+F (waypaper)."
     fi
 
     if [[ "$INIT_SYSTEM" == "systemd" ]]; then
@@ -1144,6 +1156,46 @@ else
     warn "Couldn't auto-detect the sensor. Set 'hwmon-path' in $WAYBAR_JSONC by hand (run 'sensors' or check /sys/class/hwmon/*/name)."
 fi
 
+# ---------- wallust (wallpaper-driven colors for mango + waybar) ----------
+step "Wallust color scheme"
+WALLUST_TOML_SRC="$CONFIG_DIR/config/wallust/wallust.toml"
+WALLUST_TEMPLATE_SRC="$CONFIG_DIR/config/wallust/templates/mango-colors.conf"
+if [[ -f "$WALLUST_TOML_SRC" ]]; then
+    mkdir -p "$HOME/.config/wallust/templates"
+    cp "$WALLUST_TOML_SRC" "$HOME/.config/wallust/wallust.toml"
+    [[ -f "$WALLUST_TEMPLATE_SRC" ]] && cp "$WALLUST_TEMPLATE_SRC" "$HOME/.config/wallust/templates/mango-colors.conf"
+    ok "~/.config/wallust/wallust.toml deployed"
+
+    # Wire wallust-reload.sh into waypaper so a wallpaper change regenerates
+    # colors.css/colors.conf automatically, instead of leaving the repo's
+    # bundled fallback palette in place forever.
+    mkdir -p "$HOME/.config/waypaper"
+    WAYPAPER_INI="$HOME/.config/waypaper/config.ini"
+    POST_CMD="$CONFIG_DIR/scripts/wallust-reload.sh"
+    if [[ ! -f "$WAYPAPER_INI" ]]; then
+        printf '[Settings]\npost_command = %s\n' "$POST_CMD" | write_to "$WAYPAPER_INI"
+        log_adapt "Created ~/.config/waypaper/config.ini with post_command pointing at scripts/wallust-reload.sh, so picking a new wallpaper regenerates the mango/waybar colors automatically"
+    elif ! grep -q '^post_command' "$WAYPAPER_INI"; then
+        run_sed -i "/^\[Settings\]/a post_command = ${POST_CMD}" "$WAYPAPER_INI"
+        log_adapt "Added post_command to the existing ~/.config/waypaper/config.ini, pointing at scripts/wallust-reload.sh"
+    else
+        info "~/.config/waypaper/config.ini already has a post_command set — left it alone, checking it still points at scripts/wallust-reload.sh is on you if you changed it."
+    fi
+
+    # Generate real colors for whatever wallpaper actually ends up in use,
+    # instead of relying on the bundled fallback palette (a dark red) forever.
+    if command -v wallust >/dev/null 2>&1 && [[ -n "${WALLPAPER_FALLBACK:-}" ]]; then
+        if [[ "$DRY_RUN" -eq 1 ]]; then
+            printf "  ${c_dim}would run:${c_reset} wallust run %s\n" "$WALLPAPER_FALLBACK"
+        else
+            wallust run "$WALLPAPER_FALLBACK" >/dev/null 2>&1 || warn "wallust run failed — the bundled fallback colors are still in place, run it by hand later."
+        fi
+    fi
+else
+    warn "config/wallust/wallust.toml not found in this checkout — wallust won't be configured."
+    info "Add wallust.toml to config/wallust/ and the mango-colors.conf template to config/wallust/templates/ in the repo, and this step will pick them up next run."
+fi
+
 # ---------- monitors: auto-monitors.sh (not kanshi, not wlr-randr) ----------
 # kanshi and wlr-randr both need the wlr-output-management-unstable-v1
 # protocol, which mango doesn't implement — neither one actually works here.
@@ -1215,7 +1267,7 @@ fi
 step "GTK theme (Materia-dark)"
 mkdir -p "$HOME/.config/gtk-3.0" "$HOME/.config/gtk-4.0"
 for gtk_ini in "$HOME/.config/gtk-3.0/settings.ini" "$HOME/.config/gtk-4.0/settings.ini"; do
-    cat > "$gtk_ini" <<GTKEOF
+    write_to "$gtk_ini" <<GTKEOF
 [Settings]
 gtk-theme-name=Materia-dark
 gtk-icon-theme-name=Adwaita
@@ -1224,7 +1276,7 @@ gtk-cursor-theme-size=24
 gtk-application-prefer-dark-theme=1
 GTKEOF
 done
-cat > "$HOME/.gtkrc-2.0" <<GTK2EOF
+write_to "$HOME/.gtkrc-2.0" <<GTK2EOF
 gtk-theme-name="Materia-dark"
 gtk-cursor-theme-name="Animated-Mew-Cursor"
 gtk-cursor-theme-size=24
@@ -1234,6 +1286,18 @@ if [[ -f "$AUTOSTART" ]] && ! grep -q "GTK_THEME" "$AUTOSTART"; then
 fi
 ok "gtk-3.0/gtk-4.0 settings.ini and ~/.gtkrc-2.0 written"
 log_adapt "GTK theme: applied Materia-dark the same way nwg-look would (gtk-3.0/gtk-4.0 settings.ini + ~/.gtkrc-2.0 + GTK_THEME env var), together with the Animated-Mew-Cursor cursor"
+
+# Qt apps (Ark, qBittorrent, and anything else built on Qt) ignore the GTK
+# theme entirely — they're a separate toolkit with their own theming. Since
+# Qt 5.7, qt5-base/qt6-base ship a "gtk3" platform theme built in (no extra
+# package needed) that makes Qt apps follow the current GTK3 theme, so this
+# alone should make them match Materia-dark. qt5ct/qt6ct are installed too
+# as a fallback for the Qt6 apps that don't play well with QT_QPA_PLATFORMTHEME=gtk3
+# — run qt5ct/qt6ct once and pick a dark style/palette by hand if needed.
+if [[ -f "$AUTOSTART" ]] && ! grep -q "QT_QPA_PLATFORMTHEME" "$AUTOSTART"; then
+    run_sed -i '/^export XCURSOR_THEME=/i export QT_QPA_PLATFORMTHEME=gtk3' "$AUTOSTART"
+    log_adapt "scripts/autostart.sh: added QT_QPA_PLATFORMTHEME=gtk3 — Qt apps (Ark, qBittorrent, etc.) don't read the GTK theme at all by default, this makes them follow it instead of showing up in a random light theme"
+fi
 
 # ---------- fastfetch (outside ~/.config/mango) ----------
 step "Configuring fastfetch"
@@ -1321,6 +1385,18 @@ else
     warn "The 'Animated-Mew-Cursor' theme wasn't found in the repo or already installed. Grab it manually:"
     info "https://www.gnome-look.org/c/2326996"
     info "Extract it to ~/.local/share/icons/Animated-Mew-Cursor"
+fi
+
+# config.conf's cursor_theme= (and autostart.sh's XCURSOR_THEME) currently
+# say "Samuel-Noticias-Cursor", but the only theme folder in the repo is
+# "Animated-Mew-Cursor" — nothing named Samuel-Noticias-Cursor gets
+# installed anywhere, so cursors would silently fall back to a default
+# theme. Can't tell from here whether the folder needs renaming or the
+# config reference does, so just flagging it rather than guessing.
+CURSOR_CONF_NAME="$(grep -m1 '^cursor_theme=' "$CONFIG_DIR/config.conf" 2>/dev/null | cut -d= -f2)"
+if [[ -n "$CURSOR_CONF_NAME" && "$CURSOR_CONF_NAME" != "Animated-Mew-Cursor" ]] \
+   && [[ ! -d "$HOME/.local/share/icons/$CURSOR_CONF_NAME" && ! -d "$HOME/.icons/$CURSOR_CONF_NAME" && ! -d "/usr/share/icons/$CURSOR_CONF_NAME" ]]; then
+    warn "config.conf sets cursor_theme=$CURSOR_CONF_NAME, but no theme with that name exists in the repo or is installed (only Animated-Mew-Cursor is) — cursors will silently fall back to a default theme."
 fi
 
 # ---------- GRUB (ultragrub: theme + boot entry patch) ----------
@@ -1436,8 +1512,9 @@ if [[ "${#ADAPTATIONS[@]}" -gt 0 ]]; then
 fi
 printf "\n${c_bold}${c_yellow}Worth double-checking by hand${c_reset}\n"
 info "Multi-monitor layout: handled live by scripts/auto-monitors.sh --watch — check its log with 'journalctl' or just run it by hand (no --watch) to see what it detected"
-info "The Animated-Mew-Cursor theme, if it wasn't already installed (see the warning above)"
-info "Pick a wallpaper with SUPER+F (waypaper) any time you want to change it"
+info "The cursor theme name in config.conf (see the warning above if it didn't match what's installed)"
+info "Pick a wallpaper with SUPER+F (waypaper) any time you want to change it — wallust will regenerate colors automatically from then on"
+info "Spicetify: autostart.sh runs 'spicetify backup apply' every login, but that needs one manual first-time setup after logging into Spotify — run 'spicetify backup apply' yourself once, following spicetify's own setup guide, before it'll do anything on autostart"
 echo
 printf "${c_bold}${c_blue}To start:${c_reset} log in on a TTY and run '%bmango%b', or pick Mango from ly's session list.\n" "$c_mauve" "$c_reset"
 echo
