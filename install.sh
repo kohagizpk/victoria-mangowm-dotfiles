@@ -565,6 +565,21 @@ case "$INIT_SYSTEM" in
     systemd) PACKAGES+=(ly) ;;
 esac
 
+# pacman flat-out refuses to resolve package conflicts (e.g. waybar-git
+# replacing waybar) when --noconfirm is set — it errors out instead of
+# asking, which looks like the install just failed outright. Remove the
+# stable package first for anything in the list that has a -git counterpart,
+# so there's no conflict left for the --noconfirm transaction to trip over.
+for pkg in "${PACKAGES[@]}"; do
+    [[ "$pkg" == *-git ]] || continue
+    stable="${pkg%-git}"
+    if pacman -Qq "$stable" >/dev/null 2>&1; then
+        step "Resolving $stable -> $pkg"
+        run sudo pacman -R --noconfirm "$stable"
+        ok "Removed $stable, $pkg will take its place"
+    fi
+done
+
 step "Packages (${#PACKAGES[@]})"
 info "${PACKAGES[*]}"
 info "Using --noconfirm so this doesn't sit waiting on an easy-to-miss prompt (e.g. picking between multiple providers for the same package)."
