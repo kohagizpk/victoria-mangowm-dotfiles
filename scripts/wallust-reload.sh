@@ -42,6 +42,5 @@ fi
 #    (injeta o módulo #battery no config.jsonc via sed quando
 #    encontra /sys/class/power_supply/BAT*). Chamar waybar na mão
 #    perderia essa lógica a cada troca de wallpaper.
-pkill -x waybar || true
 bash "$HOME/.config/mango/scripts/waybar-launch.sh" &
 disown

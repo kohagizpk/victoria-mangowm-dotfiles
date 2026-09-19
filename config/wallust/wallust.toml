@@ -1,0 +1,12 @@
+# Install to ~/.config/wallust/wallust.toml
+# (the template file goes to ~/.config/wallust/quickshell-colors.json,
+# see quickshell/scripts/apply-wallust.sh for the one-line i
+
+palette = "kmeans"
+
+[templates]
+waybar = { template = '../../mango/waybar/waybar-colors.css', target = '~/.config/mango/waybar/colors.css' }
+mango = { template = 'mango-colors.conf', target = '~/.config/mango/colors.conf' }
+
+[hooks]
+mango_reload = "mmsg dispatch reload_config"

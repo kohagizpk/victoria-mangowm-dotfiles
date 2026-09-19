@@ -1,6 +1,7 @@
 #!/bin/sh
 
-export XCURSOR_THEME=Samuel-Noticias-Cursor
+export QT_QPA_PLATFORMTHEME=gtk3
+export XCURSOR_THEME=Animated-Mew-Cursor
 export XCURSOR_SIZE=24
 export XDG_CURRENT_DESKTOP=wlroots
 export XDG_SESSION_TYPE=wayland
@@ -29,7 +30,8 @@ sleep 0.8
 /usr/lib/xdg-desktop-portal --replace &
 sleep 0.8
 
-bash ~/.config/mango/scripts/waybar-launch.sh >/dev/null 2>&1 &
+bash ~/.local/bin/fix-volume.sh
+bash ~/.config/mango/scripts/waybar-launch.sh &
 awww-daemon &
 sleep 0.5
 waypaper --restore &
