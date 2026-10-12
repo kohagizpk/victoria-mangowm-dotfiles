@@ -1,6 +1,6 @@
-# Install to ~/.config/wallust/wallust.toml
-# (the template file goes to ~/.config/wallust/quickshell-colors.json,
-# see quickshell/scripts/apply-wallust.sh for the one-line i
+# Instalar em ~/.config/wallust/wallust.toml
+# (o template do mango vai em ~/.config/wallust/templates/mango-colors.conf;
+#  o install.sh copia os dois automaticamente)
 
 palette = "kmeans"
 
@@ -9,4 +9,6 @@ waybar = { template = '../../mango/waybar/waybar-colors.css', target = '~/.confi
 mango = { template = 'mango-colors.conf', target = '~/.config/mango/colors.conf' }
 
 [hooks]
+# O mango já recarrega sozinho quando o colors.conf muda (auto_reload_config=1);
+# este hook só garante o reload caso isso esteja desligado.
 mango_reload = "mmsg dispatch reload_config"

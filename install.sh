@@ -261,7 +261,7 @@ IN_PLACE=0
 if [[ "$SCRIPT_DIR" == "$CONFIG_DIR" ]]; then
     SOURCE_DIR="$SCRIPT_DIR"
     IN_PLACE=1
-elif [[ -f "$SCRIPT_DIR/config.conf" && -f "$SCRIPT_DIR/scripts/autostart.sh" ]]; then
+elif [[ -f "$SCRIPT_DIR/config.conf" && -f "$SCRIPT_DIR/autostart.sh" ]]; then
     SOURCE_DIR="$SCRIPT_DIR"
 else
     step "No local checkout found next to this script"
@@ -911,7 +911,7 @@ fi
 step "Applying corrections"
 
 WAYBAR_JSONC="$CONFIG_DIR/waybar/config.jsonc"
-AUTOSTART="$CONFIG_DIR/scripts/autostart.sh"
+AUTOSTART="$CONFIG_DIR/autostart.sh"
 WLOGOUT_LAYOUT="$CONFIG_DIR/config/wlogout/layout"
 WLOGOUT_THEME_SCRIPT="$CONFIG_DIR/scripts/wlogout-theme.sh"
 
@@ -922,28 +922,6 @@ if [[ -f "$WAYBAR_JSONC" ]]; then
         -e 's/systemctl reboot/loginctl reboot/' \
         "$WAYBAR_JSONC"
     log_adapt "waybar/config.jsonc: systemctl poweroff/reboot -> loginctl (no systemd here)"
-fi
-
-# 2) wlogout: hyprlock/hyprctl (Hyprland) don't exist here -> swaylock-effects/mmsg
-#    (mango's IPC syntax >= 0.14.0)
-if [[ -f "$WLOGOUT_LAYOUT" ]]; then
-    run_sed -i \
-        -e 's/"action" : "hyprlock"/"action" : "swaylock -f"/' \
-        -e 's/"action" : "hyprctl dispatch exit"/"action" : "mmsg dispatch quit"/' \
-        "$WLOGOUT_LAYOUT"
-    log_adapt "config/wlogout/layout: hyprlock -> swaylock -f, hyprctl dispatch exit -> mmsg dispatch quit (those were Hyprland commands, not mango's; mmsg syntax updated for >= 0.14.0)"
-fi
-
-# 3) wlogout-theme.sh no longer exists in the repo — the power button in
-#    waybar calls "wlogout" directly now instead of going through it. Kept
-#    here (gated on the file existing) in case an older checkout or a fork
-#    still has it, normalizing whichever broken path state it's in.
-if [[ -f "$WLOGOUT_THEME_SCRIPT" ]]; then
-    run_sed -i -E \
-        -e 's#^BASE=".*/\.config/mango/(kohagi_personal_configs|config)/wlogout"#BASE="'"${CONFIG_DIR}"'/config/wlogout"#' \
-        -e 's#^TARGET=".*/\.config/wlogout"#TARGET="'"${HOME}"'/.config/wlogout"#' \
-        "$WLOGOUT_THEME_SCRIPT"
-    log_adapt "scripts/wlogout-theme.sh: BASE/TARGET normalized to \$CONFIG_DIR/config/wlogout and \$HOME/.config/wlogout (the file has pointed at a quoted ~, a hardcoded /home/julia, and the old kohagi_personal_configs path across different repo revisions)"
 fi
 
 if [[ -d "$CONFIG_DIR/config/wlogout" ]]; then
@@ -957,7 +935,7 @@ fi
 if [[ -f "$AUTOSTART" ]]; then
     if ! grep -q "swayosd-server" "$AUTOSTART"; then
         printf '\npgrep -x swayosd-server >/dev/null || swayosd-server &\n' >> "$AUTOSTART"
-        log_adapt "scripts/autostart.sh: added swayosd-server startup (used by volume.sh/brightness.sh but was never started)"
+        log_adapt "autostart.sh: added swayosd-server startup (used by volume.sh/brightness.sh but was never started)"
     fi
 
     if ! grep -q "xfce-polkit" "$AUTOSTART"; then
@@ -970,7 +948,7 @@ elif [ -x /usr/lib/xfce-polkit/xfce-polkit ]; then
     pgrep -f xfce-polkit >/dev/null || /usr/lib/xfce-polkit/xfce-polkit &
 fi
 POLKITEOF
-        log_adapt "scripts/autostart.sh: added a polkit agent startup (xfce-polkit) — nothing was providing GUI privilege prompts before"
+        log_adapt "autostart.sh: added a polkit agent startup (xfce-polkit) — nothing was providing GUI privilege prompts before"
     fi
 
     WALLPAPER_FALLBACK="$(find "$CONFIG_DIR/config" "$CONFIG_DIR/wallpaper" -maxdepth 2 \( -iname 'wallpaper*.png' -o -iname 'wallpaper*.jpg' \) 2>/dev/null | head -1)"
@@ -981,83 +959,15 @@ if [ -f "$HOME/.config/waypaper/config.ini" ]; then\
 else\
     awww img "'"${WALLPAPER_FALLBACK}"'" \&\
 fi' "$AUTOSTART"
-        log_adapt "scripts/autostart.sh: waypaper --restore does nothing on a fresh install (no saved state yet) -> falls back to 'awww img' with a bundled wallpaper so you get one immediately (swaybg isn't the backend here anymore, awww is)"
+        log_adapt "autostart.sh: waypaper --restore does nothing on a fresh install (no saved state yet) -> falls back to 'awww img' with a bundled wallpaper so you get one immediately (swaybg isn't the backend here anymore, awww is)"
     elif [[ -z "$WALLPAPER_FALLBACK" ]]; then
         info "No wallpaper image bundled in the repo right now, so no fallback was set up — the desktop will have no wallpaper until you pick one with SUPER+F (waypaper)."
     fi
 
     if [[ "$INIT_SYSTEM" == "systemd" ]]; then
         run_sed -i 's/^dbus-update-activation-environment \\$/dbus-update-activation-environment --systemd \\/' "$AUTOSTART"
-        log_adapt "scripts/autostart.sh: added --systemd to dbus-update-activation-environment (you're on systemd, this also propagates the env vars to systemd --user)"
+        log_adapt "autostart.sh: added --systemd to dbus-update-activation-environment (you're on systemd, this also propagates the env vars to systemd --user)"
     fi
-fi
-
-# 5) volume.sh: the mute notification pointed at an icon that doesn't exist anywhere in the repo
-if [[ -f "$CONFIG_DIR/scripts/volume.sh" ]]; then
-    run_sed -i 's#\${HOME}/\.config/rice_assets/Icons/mute\.png#/usr/share/icons/Adwaita/96x96/status/audio-volume-muted-symbolic.symbolic.png#' "$CONFIG_DIR/scripts/volume.sh"
-    log_adapt "scripts/volume.sh: fixed the mute icon path (the old one doesn't exist anywhere in the repo)"
-fi
-
-# 6) waybar tags/workspaces module. Waybar's own compatibility table lists
-#    full native support for Mango (workspaces, window, layout, language,
-#    mode) via "mango/*" modules talking straight to mango's socket — and
-#    unlike a custom script, the native module correctly shows each
-#    monitor's own tags in a multi-monitor setup instead of always reading
-#    monitor 1. dwl/tags and dwl/window both use the dwl-ipc protocol mango
-#    has deprecated, so upgrade those specifically. If the config already
-#    uses ext/workspaces, leave it — it might already be working, and
-#    there's no reliable way from here to confirm the installed waybar
-#    build is new enough for mango/workspaces without risking a working
-#    setup to find out.
-# 6) waybar tags/workspaces module. Waybar's own compatibility table lists
-#    full native support for Mango (workspaces, window, layout, language,
-#    mode) via "mango/*" modules talking straight to mango's socket — and
-#    unlike a custom script, the native module correctly shows each
-#    monitor's own tags in a multi-monitor setup instead of always reading
-#    monitor 1. dwl/tags and dwl/window both use the dwl-ipc protocol mango
-#    has deprecated, so upgrade those specifically. If the config already
-#    uses ext/workspaces, leave it — it might already be working, and
-#    there's no reliable way from here to confirm the installed waybar
-#    build is new enough for mango/workspaces without risking a working
-#    setup to find out.
-if [[ -f "$WAYBAR_JSONC" ]] && grep -q '"dwl/tags"' "$WAYBAR_JSONC"; then
-    run_sed -i 's/"dwl\/tags",/"mango\/workspaces",/' "$WAYBAR_JSONC"
-    run_sed -i '/"dwl\/tags": {/,/^    },/c\
-    "mango/workspaces": {\
-        "format": "{name}"\
-    },' "$WAYBAR_JSONC"
-    log_adapt "waybar/config.jsonc: dwl/tags -> mango/workspaces (dwl-ipc is deprecated in mango; the native mango/workspaces module also shows each monitor's own tags correctly, which a custom script reading all_tags[0] can't)"
-fi
-
-if [[ -f "$WAYBAR_JSONC" ]] && grep -q '"dwl/window"' "$WAYBAR_JSONC"; then
-    run_sed -i 's/"dwl\/window"/"mango\/window"/g' "$WAYBAR_JSONC"
-    log_adapt "waybar/config.jsonc: dwl/window -> mango/window (mango's own release notes: dwl-ipc is deprecated, rename dwl/window to mango/window)"
-fi
-
-if [[ -f "$WAYBAR_JSONC" ]] && grep -q '"ext/workspaces"' "$WAYBAR_JSONC"; then
-    info "waybar/config.jsonc already uses ext/workspaces for tags. Mango also has its own mango/workspaces module (properly monitor-aware, per Waybar's own compatibility table) — worth trying if ext/workspaces ever misbehaves with more than one monitor. Left as-is for now since ext/workspaces may already be working."
-fi
-
-
-
-# 7) config.conf: tag 1's tagrule is missing the "tagrule" prefix (a broken
-#    line that has no effect and could confuse the parser)
-if [[ -f "$CONFIG_DIR/config.conf" ]] && grep -qx '=id:1,layout_name:scroller' "$CONFIG_DIR/config.conf"; then
-    run_sed -i 's/^=id:1,layout_name:scroller$/#&  # broken line (missing the "tagrule" prefix) - commented out by install.sh/' "$CONFIG_DIR/config.conf"
-    log_adapt "config.conf: commented out the line '=id:1,layout_name:scroller' (missing the 'tagrule=' prefix, had no effect and could confuse the parser). If you actually wanted tag 1 on the scroller layout instead of tile, let me know and I'll fix it properly."
-fi
-
-# 8) Discord screen sharing needs --ozone-platform=wayland and the PipeWire
-#    capturer feature flag. Both scripts.sh/autostart.sh's "discord &" and
-#    config.conf's SUPER+A bind have gone back and forth between having these
-#    flags and not across repo edits — force them on in both places.
-if [[ -f "$AUTOSTART" ]] && grep -qx 'discord &' "$AUTOSTART"; then
-    run_sed -i 's/^discord &$/discord --enable-features=UseOzonePlatform,WebRTCPipeWireCapturer --ozone-platform=wayland \&/' "$AUTOSTART"
-    log_adapt "scripts/autostart.sh: discord now launches with --ozone-platform=wayland + WebRTCPipeWireCapturer (screen sharing silently breaks without these)"
-fi
-if [[ -f "$CONFIG_DIR/config.conf" ]] && grep -qx 'bind=SUPER,a,spawn,discord' "$CONFIG_DIR/config.conf"; then
-    run_sed -i 's/^bind=SUPER,a,spawn,discord$/bind=SUPER,a,spawn,discord --enable-features=UseOzonePlatform,WebRTCPipeWireCapturer --ozone-platform=wayland/' "$CONFIG_DIR/config.conf"
-    log_adapt "config.conf: SUPER+A now launches Discord with the same --ozone-platform=wayland/PipeWire flags, so screen sharing works no matter how you opened it"
 fi
 
 # 9) xdg-desktop-portal: with both -wlr and -gtk backends installed, explicitly
@@ -1073,59 +983,7 @@ org.freedesktop.impl.portal.Screenshot=wlr
 PORTALSEOF
 log_adapt "Added ~/.config/xdg-desktop-portal/portals.conf pinning ScreenCast/Screenshot to xdg-desktop-portal-wlr (the gtk portal doesn't implement screen sharing at all) — makes Discord screen share reliable regardless of portal startup order"
 
-# 10) mango can't bind btn_left/btn_right with modifier NONE (this is a known
-#     engine limitation, not a config mistake — upstream's own example config
-#     has the exact same comment). It logs an error and just skips the bind,
-#     but toggleoverview/killclient already have working keybinds elsewhere
-#     (ALT+Tab, SUPER+q), so these two lines are pure noise on every start.
-if [[ -f "$CONFIG_DIR/config.conf" ]] && grep -q '^mousebind=NONE,btn_\(left\|right\),' "$CONFIG_DIR/config.conf"; then
-    run_sed -i -E 's/^(mousebind=NONE,btn_(left|right),.*)$/# \1  # mango can'"'"'t bind btn_left\/btn_right with NONE - already bound to ALT+Tab \/ SUPER+q/' "$CONFIG_DIR/config.conf"
-    log_adapt "config.conf: commented out mousebind=NONE,btn_left/btn_right (mango rejects NONE as a modifier for those two buttons — it's a known engine limitation, and both actions already have working keybinds: ALT+Tab and SUPER+q)"
-fi
-
 ok "Corrections applied"
-
-# 11) config.conf: SUPER+W is bound to "helium-browsers" (extra "s") — the
-#     package/binary is "helium-browser", so this keybind has never worked.
-if [[ -f "$CONFIG_DIR/config.conf" ]] && grep -qx 'bind=SUPER,w,spawn,helium-browsers' "$CONFIG_DIR/config.conf"; then
-    run_sed -i 's/^bind=SUPER,w,spawn,helium-browsers$/bind=SUPER,w,spawn,helium-browser/' "$CONFIG_DIR/config.conf"
-    log_adapt "config.conf: bind=SUPER,w,spawn,helium-browsers -> helium-browser (typo — the binary doesn't have a trailing 's', so this keybind silently did nothing)"
-fi
-
-# 12) scripts/print.sh has no shebang. mango spawns it via execvp(), and
-#     glibc happens to fall back to /bin/sh when execve() fails with ENOEXEC
-#     (no shebang) — that's real, documented POSIX behavior, so it currently
-#     works, but it's fragile (breaks on musl-based systems, for example)
-#     and one `chmod +x` + direct invocation away from failing outright.
-if [[ -f "$CONFIG_DIR/scripts/print.sh" ]] && ! head -1 "$CONFIG_DIR/scripts/print.sh" | grep -q '^#!'; then
-    if [[ "$DRY_RUN" -eq 1 ]]; then
-        printf "  ${c_dim}would add shebang to:${c_reset} %s\n" "$CONFIG_DIR/scripts/print.sh"
-    else
-        printf '#!/bin/sh\n%s' "$(cat "$CONFIG_DIR/scripts/print.sh")" > "$CONFIG_DIR/scripts/print.sh"
-    fi
-    log_adapt "scripts/print.sh: added a missing #!/bin/sh shebang (it worked by accident — glibc's execvp() falls back to /bin/sh on a missing shebang, but that's not guaranteed on every libc)"
-fi
-
-# 13) autostart.sh: kanshi isn't installed anymore — monitor layout is now
-#     handled by the repo's own scripts/auto-monitors.sh (native mango
-#     monitorrule=, driven by mmsg, with hotplug support), so this line
-#     would just be a harmless "command not found" at best. Comment it out
-#     instead of leaving that in every boot log.
-if [[ -f "$AUTOSTART" ]] && grep -qx 'kanshi &' "$AUTOSTART"; then
-    run_sed -i 's/^kanshi &$/# kanshi & # replaced by scripts\/auto-monitors.sh, see install.sh/' "$AUTOSTART"
-    log_adapt "scripts/autostart.sh: commented out 'kanshi &' — monitor layout is handled by scripts/auto-monitors.sh now, kanshi isn't installed by this script anymore"
-fi
-
-# 14) config.conf: two binds use a comma between SUPER and SHIFT
-#     (bind=SUPER,SHIFT,Left,...) instead of a +. mango's own docs are
-#     explicit that comma separates bind FIELDS (mod,key,dispatcher,args)
-#     while + combines modifiers WITHIN one field — every other multi-mod
-#     bind in this file correctly uses +, only these two don't, so they
-#     likely don't bind what they're supposed to.
-if [[ -f "$CONFIG_DIR/config.conf" ]] && grep -qE '^bind=SUPER,SHIFT,(Left|Right),' "$CONFIG_DIR/config.conf"; then
-    run_sed -i -E 's/^bind=SUPER,SHIFT,(Left|Right),/bind=SUPER+SHIFT,\1,/' "$CONFIG_DIR/config.conf"
-    log_adapt "config.conf: bind=SUPER,SHIFT,Left/Right -> bind=SUPER+SHIFT,Left/Right (comma between modifiers is a field separator in mango's syntax, not a way to combine them — this matches every other multi-modifier bind already in the file)"
-fi
 
 
 # ---------- CPU temperature sensor (waybar) ----------
@@ -1189,30 +1047,20 @@ else
     info "Add wallust.toml to config/wallust/ and the mango-colors.conf template to config/wallust/templates/ in the repo, and this step will pick them up next run."
 fi
 
-# ---------- monitors: auto-monitors.sh (not kanshi, not wlr-randr) ----------
-# kanshi and wlr-randr both need the wlr-output-management-unstable-v1
-# protocol, which mango doesn't implement — neither one actually works here.
-# The repo's own scripts/auto-monitors.sh handles this correctly instead:
-# it reads real monitor state from "mmsg get all-monitors" (mango's own
-# IPC), writes monitorrule= lines into config.conf inside a marked block,
-# and (with --watch, which is how autostart.sh calls it) reapplies on every
-# hotplug automatically. Nothing to ask the user here — just make sure it
-# can actually find mango's socket.
-step "Monitor layout (auto-monitors.sh)"
-AUTO_MONITORS_SCRIPT="$CONFIG_DIR/scripts/auto-monitors.sh"
-if [[ -f "$AUTO_MONITORS_SCRIPT" ]]; then
-    if ! grep -q "MANGO_INSTANCE_SIGNATURE:-" "$AUTO_MONITORS_SCRIPT"; then
-        run_sed -i '/^apply_layout() {/a\
-\tif [ -z "${MANGO_INSTANCE_SIGNATURE:-}" ]; then\
-\t\tsig="$(find "${XDG_RUNTIME_DIR:-/run/user/$(id -u)}" /tmp -maxdepth 2 -type s -iname '"'"'*mango*'"'"' 2>/dev/null | head -1)"\
-\t\t[ -n "$sig" ] \&\& export MANGO_INSTANCE_SIGNATURE="$sig"\
-\tfi' "$AUTO_MONITORS_SCRIPT"
-        log_adapt "scripts/auto-monitors.sh: added the same MANGO_INSTANCE_SIGNATURE auto-detection as waybar-tags.sh — it wasn't always inherited from the parent process on -git builds, which would make apply_layout silently give up on the very first run"
-    fi
-    chmod +x "$AUTO_MONITORS_SCRIPT"
-    ok "Layout is handled live by auto-monitors.sh --watch (already wired into autostart.sh) — nothing hardcoded here"
+# ---------- monitors: monitor.conf (fixed rules) ----------
+# monitor.conf ships with the repo author's two monitors (DP-1 @165Hz + HDMI-A-1).
+# mango has no way to auto-detect outputs before the session starts, and
+# kanshi / wlr-randr don't work here (mango doesn't implement
+# wlr-output-management), so on any other machine the rules just need the
+# right output names. Outputs with no matching rule still work (mango picks
+# their preferred mode), they just aren't positioned.
+step "Monitor layout (monitor.conf)"
+if [[ -f "$CONFIG_DIR/monitor.conf" ]]; then
+    warn "monitor.conf is tuned for DP-1 @165Hz + HDMI-A-1 (the author's setup)."
+    info "Find your output names with 'wlr-randr' (inside a mango session) and edit $CONFIG_DIR/monitor.conf."
+    log_adapt "monitor.conf: kept as shipped (DP-1 @165Hz + HDMI-A-1) — edit the output names/modes for your own monitors"
 else
-    warn "scripts/auto-monitors.sh not found in this checkout — multi-monitor layout won't be configured automatically. mango has its own monitorrule= directive in config.conf if you want to set one up by hand (see mango's docs, Configuration > Monitors)."
+    warn "monitor.conf not found in this checkout — outputs will use mango's defaults. See mango's docs, Configuration > Monitors (monitor_rule=)."
 fi
 
 # ---------- keyboard layout (asked earlier, applied now) ----------
@@ -1257,6 +1105,9 @@ if [[ -n "${KB_CONSOLE:-}" ]]; then
 fi
 
 
+CURSOR_NAME="$(grep -m1 '^cursor_theme=' "$CONFIG_DIR/config.conf" 2>/dev/null | cut -d= -f2)"
+CURSOR_NAME="${CURSOR_NAME:-Samuel-Noticias-Cursor}"
+
 step "GTK theme (Materia-dark)"
 mkdir -p "$HOME/.config/gtk-3.0" "$HOME/.config/gtk-4.0"
 for gtk_ini in "$HOME/.config/gtk-3.0/settings.ini" "$HOME/.config/gtk-4.0/settings.ini"; do
@@ -1264,21 +1115,21 @@ for gtk_ini in "$HOME/.config/gtk-3.0/settings.ini" "$HOME/.config/gtk-4.0/setti
 [Settings]
 gtk-theme-name=Materia-dark
 gtk-icon-theme-name=Adwaita
-gtk-cursor-theme-name=Animated-Mew-Cursor
+gtk-cursor-theme-name=${CURSOR_NAME}
 gtk-cursor-theme-size=24
 gtk-application-prefer-dark-theme=1
 GTKEOF
 done
 cat > "$HOME/.gtkrc-2.0" <<GTK2EOF
 gtk-theme-name="Materia-dark"
-gtk-cursor-theme-name="Animated-Mew-Cursor"
+gtk-cursor-theme-name="${CURSOR_NAME}"
 gtk-cursor-theme-size=24
 GTK2EOF
 if [[ -f "$AUTOSTART" ]] && ! grep -q "GTK_THEME" "$AUTOSTART"; then
     run_sed -i '/^export XCURSOR_THEME=/i export GTK_THEME=Materia-dark:dark' "$AUTOSTART"
 fi
 ok "gtk-3.0/gtk-4.0 settings.ini and ~/.gtkrc-2.0 written"
-log_adapt "GTK theme: applied Materia-dark the same way nwg-look would (gtk-3.0/gtk-4.0 settings.ini + ~/.gtkrc-2.0 + GTK_THEME env var), together with the Animated-Mew-Cursor cursor"
+log_adapt "GTK theme: applied Materia-dark the same way nwg-look would (gtk-3.0/gtk-4.0 settings.ini + ~/.gtkrc-2.0 + GTK_THEME env var), together with the $CURSOR_NAME cursor"
 
 # ---------- fastfetch (outside ~/.config/mango) ----------
 step "Configuring fastfetch"
@@ -1342,42 +1193,31 @@ find "$CONFIG_DIR" -name '*.sh' -exec chmod +x {} \;
 ok "Scripts marked executable"
 
 # ---------- cursor ----------
-step "Cursor (Animated-Mew-Cursor)"
-CURSOR_SRC="$CONFIG_DIR/config/Animated-Mew-Cursor"
-CURSOR_DST="$HOME/.local/share/icons/Animated-Mew-Cursor"
+# The theme name comes from cursor_theme= in config.conf (CURSOR_NAME, set above).
+# If a folder with that name exists in config/ it is installed from the repo,
+# otherwise we only check whether the theme is already installed on the system.
+step "Cursor ($CURSOR_NAME)"
+CURSOR_SRC="$CONFIG_DIR/config/$CURSOR_NAME"
+CURSOR_DST="$HOME/.local/share/icons/$CURSOR_NAME"
 if [[ -d "$CURSOR_SRC" ]]; then
     mkdir -p "$HOME/.local/share/icons"
     rm -rf "$CURSOR_DST"
     cp -a "$CURSOR_SRC" "$CURSOR_DST"
     find "$CURSOR_DST" -maxdepth 1 -name '.~lock.*#' -delete 2>/dev/null
     ok "Cursor copied from the repo to $CURSOR_DST"
-    log_adapt "Cursor: the Animated-Mew-Cursor theme now ships in the repo -> copied to ~/.local/share/icons/"
+    log_adapt "Cursor: the $CURSOR_NAME theme ships in the repo (config/$CURSOR_NAME) -> copied to ~/.local/share/icons/"
 
-    # index.theme should be plain text ([Icon Theme]...); in the repo right
-    # now it's saved as OpenDocument Text, not the actual theme file.
+    # index.theme should be plain text ([Icon Theme]...)
     if [[ -f "$CURSOR_DST/index.theme" ]] && ! head -c 200 "$CURSOR_DST/index.theme" 2>/dev/null | grep -q '\[Icon Theme\]'; then
         warn "$CURSOR_DST/index.theme isn't a valid theme file (looks like 'OpenDocument Text', not plain text)."
         info "The files under cursors/ are real X11 cursors and should still work via XCURSOR_THEME,"
-        info "but index.theme/cursor.theme need to be fixed in the repo (looks like a .odt got committed in the wrong place)."
+        info "but index.theme/cursor.theme need to be re-saved as plain text."
     fi
-elif [[ -d "$HOME/.local/share/icons/Animated-Mew-Cursor" || -d "$HOME/.icons/Animated-Mew-Cursor" || -d "/usr/share/icons/Animated-Mew-Cursor" ]]; then
+elif [[ -d "$HOME/.local/share/icons/$CURSOR_NAME" || -d "$HOME/.icons/$CURSOR_NAME" || -d "/usr/share/icons/$CURSOR_NAME" ]]; then
     ok "Cursor theme already present"
 else
-    warn "The 'Animated-Mew-Cursor' theme wasn't found in the repo or already installed. Grab it manually:"
-    info "https://www.gnome-look.org/c/2326996"
-    info "Extract it to ~/.local/share/icons/Animated-Mew-Cursor"
-fi
-
-# config.conf's cursor_theme= (and autostart.sh's XCURSOR_THEME) currently
-# say "Samuel-Noticias-Cursor", but the only theme folder in the repo is
-# "Animated-Mew-Cursor" — nothing named Samuel-Noticias-Cursor gets
-# installed anywhere, so cursors would silently fall back to a default
-# theme. Can't tell from here whether the folder needs renaming or the
-# config reference does, so just flagging it rather than guessing.
-CURSOR_CONF_NAME="$(grep -m1 '^cursor_theme=' "$CONFIG_DIR/config.conf" 2>/dev/null | cut -d= -f2)"
-if [[ -n "$CURSOR_CONF_NAME" && "$CURSOR_CONF_NAME" != "Animated-Mew-Cursor" ]] \
-   && [[ ! -d "$HOME/.local/share/icons/$CURSOR_CONF_NAME" && ! -d "$HOME/.icons/$CURSOR_CONF_NAME" && ! -d "/usr/share/icons/$CURSOR_CONF_NAME" ]]; then
-    warn "config.conf sets cursor_theme=$CURSOR_CONF_NAME, but no theme with that name exists in the repo or is installed (only Animated-Mew-Cursor is) — cursors will silently fall back to a default theme."
+    warn "cursor_theme=$CURSOR_NAME (config.conf) isn't in the repo (config/$CURSOR_NAME) and isn't installed — cursors fall back to a default theme until it is."
+    info "Put the theme folder in ~/.local/share/icons/$CURSOR_NAME (or in config/$CURSOR_NAME in the repo, so this step installs it for you)."
 fi
 
 # ---------- GRUB (ultragrub: theme + boot entry patch) ----------
@@ -1473,7 +1313,7 @@ else
     check_cmd mmsg
     check_file "$CONFIG_DIR/config.conf" "config.conf deployed"
     check_file "$HOME/.config/wlogout/layout" "wlogout theme deployed"
-    check_file "$HOME/.local/share/icons/Animated-Mew-Cursor" "cursor theme installed"
+    check_file "$HOME/.local/share/icons/$CURSOR_NAME" "cursor theme installed"
 fi
 if [[ "$HEALTH_OK" -eq 1 ]]; then
     ok "Everything checks out"
@@ -1492,8 +1332,8 @@ if [[ "${#ADAPTATIONS[@]}" -gt 0 ]]; then
     done
 fi
 printf "\n${c_bold}${c_yellow}Worth double-checking by hand${c_reset}\n"
-info "Multi-monitor layout: handled live by scripts/auto-monitors.sh --watch — check its log with 'journalctl' or just run it by hand (no --watch) to see what it detected"
-info "The cursor theme name in config.conf (see the warning above if it didn't match what's installed)"
+info "monitor.conf: shipped with DP-1 @165Hz + HDMI-A-1 — edit the output names/modes there for your own monitors (wlr-randr lists them)"
+info "The cursor theme name in config.conf (cursor_theme=) — see the warning above if that theme isn't installed"
 info "Pick a wallpaper with SUPER+F (waypaper) any time you want to change it — wallust will regenerate colors automatically from then on"
 info "Spicetify: autostart.sh runs 'spicetify backup apply' every login, but that needs one manual first-time setup after logging into Spotify — run 'spicetify backup apply' yourself once, following spicetify's own setup guide, before it'll do anything on autostart"
 echo
