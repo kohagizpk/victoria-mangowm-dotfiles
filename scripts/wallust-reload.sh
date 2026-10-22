@@ -17,13 +17,17 @@
 
 set -euo pipefail
 
-MONITOR="HDMI-A-1"
-LOG="$HOME/.cache/wallust-reload.log"
-
-WALLPAPER="$(awww query 2>/dev/null | grep "$MONITOR:" | sed -n 's/.*currently displaying: image: //p' | head -n1)"
-
-if [[ -z "$WALLPAPER" ]]; then
-    echo "$(date '+%F %T') -- nao achei o wallpaper atual de $MONITOR via 'awww query'" >>"$LOG"
+# Preserve the author's preferred output; fall back on single-monitor setups.
+MONITOR="${VICTORIA_COLOR_MONITOR:-HDMI-A-1}"
+mkdir -p "${XDG_CACHE_HOME:-$HOME/.cache}"
+LOG="${XDG_CACHE_HOME:-$HOME/.cache}/wallust-reload.log"
+QUERY="$(awww query 2>/dev/null || true)"
+WALLPAPER="$(printf '%s\n' "$QUERY" | awk -v monitor="$MONITOR:" '$1 == monitor {sub(/.*currently displaying: image: /, ""); print; exit}')"
+if [[ ! -f "$WALLPAPER" ]]; then
+    WALLPAPER="$(printf '%s\n' "$QUERY" | sed -n 's/.*currently displaying: image: //p' | head -n1)"
+fi
+if [[ ! -f "$WALLPAPER" ]]; then
+    printf '%s -- no active wallpaper found\n' "$(date '+%F %T')" >> "$LOG"
     exit 1
 fi
 
@@ -32,7 +36,7 @@ fi
     echo "---- $(date '+%F %T') ----"
     echo "monitor fixo: $MONITOR"
     echo "wallpaper usado: $WALLPAPER"
-    echo -n "wallust: "; which wallust || echo "NAO ENCONTRADO"
+    echo -n "wallust: "; command -v wallust || echo "NAO ENCONTRADO"
     wallust run "$WALLPAPER"
     echo -n "color5 gerado: "; grep '^@define-color color5' "$HOME/.config/mango/waybar/colors.css"
 } >>"$LOG" 2>&1

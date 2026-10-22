@@ -12,7 +12,7 @@
 # Usage: run it from inside a checkout of this repo (./install.sh), or drop
 # it anywhere and it will clone the repo itself.
 
-set -euo pipefail
+set -Eeuo pipefail
 
 REPO_URL="https://github.com/kohagizpk/victoria-mangowm-dotfiles.git"
 CONFIG_DIR="$HOME/.config/mango"
@@ -23,11 +23,33 @@ for arg in "$@"; do
         --dry-run) DRY_RUN=1 ;;
         -h|--help)
             echo "Usage: $0 [--dry-run]"
-            echo "  --dry-run   Show every command this script would run, without running any of it."
+            echo "  --dry-run   Show a read-only installation plan (no system changes)."
             exit 0
             ;;
+        *) printf "Unknown option: %s\n" "$arg" >&2; exit 2 ;;
     esac
 done
+
+# Deliberately separate the read-only plan from the execution path. Wrapping
+# individual commands cannot protect shell redirections or nested installers.
+if [[ "$DRY_RUN" -eq 1 ]]; then
+    cat <<'PLAN'
+Victoria installation plan (read-only; no commands are executed)
+Primary targets: Arch Linux, Artix and CachyOS; Fedora/NixOS experimental.
+1. Detect distribution/init and ask for keyboard layout.
+2. Ask separately about Discord, Spotify and their automatic startup.
+3. Choose Helium, Firefox, Brave or no browser; optionally start it at login.
+4. Back up existing desktop configuration before deploying any files.
+5. Upgrade Arch-family packages with pacman -Syu, then install dependencies.
+6. Configure Ly; ask before hiding any other login sessions.
+7. Deploy Mango, Waybar, wallpaper hooks and selected application bindings.
+8. Apply Materia-dark-compact (GTK) and MateriaDark via Kvantum (Qt 5/6).
+9. Offer GRUB theme, fish default shell and brightness permissions.
+10. Check installed commands and report missing components.
+Run ./install.sh interactively to choose options and execute this plan.
+PLAN
+    exit 0
+fi
 
 # ---------- palette (catppuccin mocha, same accents as the waybar theme) ----------
 c_reset='\033[0m'; c_bold='\033[1m'; c_dim='\033[2m'
@@ -115,7 +137,7 @@ banner() {
 
 confirm() {
     local reply
-    read -rp "$(printf "${c_mauve}?${c_reset} %s " "$1")[y/N] " reply
+    read -rp "$(printf "${c_mauve}?${c_reset} %s " "$1")[y/N] " reply || return 1
     [[ "$reply" =~ ^[yY]$ ]]
 }
 
@@ -180,7 +202,7 @@ on_error() {
     local line="$1"
     printf "\n${c_red}✗ Something went wrong at line %s.${c_reset}\n" "$line"
     printf "  ${c_sub}Scroll up to see the actual error message right above this.${c_reset}\n"
-    printf "  ${c_sub}Most steps are safe to re-run — you can just run ./install.sh again;${c_reset}\n"
+    printf "  ${c_sub}Review the error and configuration backups before running ./install.sh again;${c_reset}\n"
     printf "  ${c_sub}already-installed packages and already-applied fixes are skipped automatically.${c_reset}\n"
 }
 trap 'on_error $LINENO' ERR
@@ -218,12 +240,17 @@ strip_other_sessions() {
 }
 
 # ---------- initial checks ----------
+if [[ ! -t 0 ]]; then
+    err "Run interactively in a terminal, or use --dry-run."
+    exit 1
+fi
+
 if [[ "${EUID}" -eq 0 ]]; then
     err "Don't run this as root. Run it as your normal user (it will ask for sudo when needed)."
     exit 1
 fi
 
-if ! (echo > /dev/tcp/github.com/443) 2>/dev/null; then
+if ! timeout 10 bash -c 'echo > /dev/tcp/github.com/443' 2>/dev/null; then
     err "Can't reach github.com — check your internet connection before running this (it downloads packages and dotfiles throughout)."
     exit 1
 fi
@@ -244,6 +271,46 @@ else
     err "This script supports Arch/Artix/CachyOS, Fedora, and NixOS."
     exit 1
 fi
+if [[ "$DISTRO_FAMILY" != arch ]]; then
+    warn "Fedora and NixOS support is experimental; Arch, Artix and CachyOS are the primary targets."
+    confirm "Continue with experimental support?" || exit 0
+fi
+
+# Application choices are stored separately from autostart commands.
+INSTALL_DISCORD=0; INSTALL_SPOTIFY=0
+START_DISCORD=0; START_SPOTIFY=0; START_BROWSER=0
+confirm "Install Discord?" && INSTALL_DISCORD=1
+confirm "Install Spotify (and Spicetify)?" && INSTALL_SPOTIFY=1
+BROWSER_COMMAND=""; BROWSER_PACKAGE=""; BROWSER_DESKTOP=""
+PS3="Default browser [1-4]: "
+select browser in Helium Firefox Brave None; do
+    case "$REPLY" in
+        1) BROWSER_COMMAND=helium-browser; BROWSER_PACKAGE=helium-browser-bin; BROWSER_DESKTOP=helium.desktop; break ;;
+        2) BROWSER_COMMAND=firefox; BROWSER_PACKAGE=firefox; BROWSER_DESKTOP=firefox.desktop; break ;;
+        3) BROWSER_COMMAND=brave; BROWSER_PACKAGE=brave-bin; BROWSER_DESKTOP=brave-browser.desktop; break ;;
+        4) break ;;
+        *) warn "Choose 1, 2, 3 or 4." ;;
+    esac
+done
+[[ -n "${browser:-}" ]] || { err "Browser selection cancelled."; exit 1; }
+if [[ "$INSTALL_DISCORD" -eq 1 ]] && confirm "Open Discord automatically at login?"; then START_DISCORD=1; fi
+if [[ "$INSTALL_SPOTIFY" -eq 1 ]] && confirm "Open Spotify automatically at login?"; then START_SPOTIFY=1; fi
+if [[ -n "$BROWSER_COMMAND" ]] && confirm "Open the browser automatically at login?"; then START_BROWSER=1; fi
+
+# Back up every user configuration tree this installer can modify, including
+# an in-place checkout. A failed copy stops installation before deployment.
+BACKUP_DIR="$(mktemp -d "$HOME/victoria-backup.XXXXXXXX")"
+for relative in .config/mango .config/wlogout .config/xdg-desktop-portal \
+    .config/wallust .config/waypaper .config/gtk-3.0 .config/gtk-4.0 \
+    .config/fastfetch .config/fish .config/kitty .config/Kvantum \
+    .config/environment.d .config/mimeapps.list .local/share/applications/mimeapps.list \
+    .local/share/icons .gtkrc-2.0 mango-nixos-snippet.nix; do
+    if [[ -e "$HOME/$relative" || -L "$HOME/$relative" ]]; then
+        mkdir -p "$BACKUP_DIR/$(dirname "$relative")"
+        cp -a "$HOME/$relative" "$BACKUP_DIR/$relative"
+    fi
+done
+info "Configuration backup: $BACKUP_DIR"
 
 # ---------- where are the dotfiles, and where should they end up? ----------
 # Three scenarios are supported:
@@ -319,7 +386,7 @@ fi
 echo
 echo "    1) us       — US"
 echo "    2) br       — Brazil (ABNT2)"
-echo "    3) br-intl  — Brazil (ABNT2, international/dead-key variant)"
+echo "    3) us-intl  — US international (dead keys)"
 echo "    4) de       — Germany"
 echo "    5) fr       — France"
 echo "    6) es       — Spain"
@@ -335,7 +402,7 @@ KB_VARIANT=""
 case "$kb_reply" in
     1)  KB_LAYOUT="us"; KB_CONSOLE="us" ;;
     2)  KB_LAYOUT="br"; KB_CONSOLE="br-abnt2" ;;
-    3)  KB_LAYOUT="br"; KB_VARIANT="intl"; KB_CONSOLE="br-abnt2" ;;
+    3)  KB_LAYOUT="us"; KB_VARIANT="intl"; KB_CONSOLE="us-acentos" ;;
     4)  KB_LAYOUT="de"; KB_CONSOLE="de" ;;
     5)  KB_LAYOUT="fr"; KB_CONSOLE="fr" ;;
     6)  KB_LAYOUT="es"; KB_CONSOLE="es" ;;
@@ -348,6 +415,11 @@ case "$kb_reply" in
         read -rp "Matching console keymap (e.g. us, br-abnt2 — leave empty to skip): " KB_CONSOLE
         ;;
 esac
+
+if [[ ! "$KB_LAYOUT" =~ ^[a-zA-Z0-9_-]+$ || ! "$KB_VARIANT" =~ ^[a-zA-Z0-9_-]*$ || ! "$KB_CONSOLE" =~ ^[a-zA-Z0-9_-]*$ ]]; then
+    err "Invalid keyboard code; use letters, digits, underscores or hyphens."
+    exit 1
+fi
 
 # ---------- summary, archinstall-style: every choice made, before anything runs ----------
 box "victoria-mangowm-dotfiles installer"
@@ -367,6 +439,12 @@ fi
 if [[ "$DRY_RUN" -eq 0 ]]; then
     info "This needs sudo for package installs and a few system files — asking once now."
     sudo -v
+    SYSTEM_BACKUP="/var/backups/victoria-$(date +%Y%m%d-%H%M%S)-$$"
+    sudo mkdir -p "$SYSTEM_BACKUP"
+    for file in /etc/pacman.conf /etc/dinit.d/config/console.conf /etc/vconsole.conf /usr/share/wayland-sessions/mango.desktop; do
+        if [[ -f "$file" ]]; then sudo cp --parents -a "$file" "$SYSTEM_BACKUP/"; fi
+    done
+    info "System configuration backup: $SYSTEM_BACKUP"
     if sudo -n true 2>/dev/null; then
         ( while true; do sleep 30; sudo -n true 2>/dev/null || exit; kill -0 "$$" 2>/dev/null || exit; done ) 2>/dev/null &
         SUDO_KEEPALIVE_PID=$!
@@ -376,22 +454,22 @@ if [[ "$DRY_RUN" -eq 0 ]]; then
 fi
 
 if [[ "$DISTRO_FAMILY" == "arch" ]]; then
-    step "Syncing package databases"
-    sudo pacman -Sy
+    step "Upgrading system packages (avoids partial upgrades)"
+    sudo pacman -Syu
 fi
 
 # ---------- Arch's own repos, on Arch-based (non-Arch) distros ----------
-# CachyOS, EndeavourOS etc. already ship Arch's [core]/[extra] repos, so this
+# CachyOS, EndeavourOS etc. already ship Arch's [extra] repos, so this
 # is a no-op there — this only ever actually does something on distros like
 # Artix that deliberately don't include them by default.
-if [[ "$DISTRO_FAMILY" == "arch" ]] && ! grep -qE '^\[(core|extra)\]' /etc/pacman.conf 2>/dev/null; then
+if [[ "$DISTRO_FAMILY" == "arch" && "$(. /etc/os-release; printf '%s' "$ID")" == artix ]] && ! grep -qE '^\[extra\]' /etc/pacman.conf 2>/dev/null; then
     step "Arch's official repos"
     DISTRO_PRETTY="$(. /etc/os-release 2>/dev/null; echo "${PRETTY_NAME:-your distro}")"
-    info "$DISTRO_PRETTY doesn't have Arch's own [core]/[extra] repos enabled."
+    info "$DISTRO_PRETTY doesn't have Arch's own [extra] repos enabled."
     info "Some AUR packages depend on things only published there (this is the standard artix-archlinux-support approach)."
     if confirm "Add them now, with a mirrorlist matched to your region?"; then
-        sudo pacman -S --needed --noconfirm artix-archlinux-support 2>/dev/null || true
-        sudo pacman-key --populate archlinux 2>/dev/null || true
+        sudo pacman -S --needed artix-archlinux-support
+        sudo pacman-key --populate archlinux
 
         # Try to reuse whatever region your existing mirrors are already in,
         # by reading the "## CountryName" comment above them (the same
@@ -426,15 +504,12 @@ if [[ "$DISTRO_FAMILY" == "arch" ]] && ! grep -qE '^\[(core|extra)\]' /etc/pacma
         if [[ -f /etc/pacman.d/mirrorlist-arch ]] && ! grep -q 'mirrorlist-arch' /etc/pacman.conf; then
             sudo tee -a /etc/pacman.conf >/dev/null <<'PACMANEOF'
 
-[core]
-Include = /etc/pacman.d/mirrorlist-arch
-
 [extra]
 Include = /etc/pacman.d/mirrorlist-arch
 PACMANEOF
-            sudo pacman -Sy
-            ok "Arch's [core] and [extra] repos added to /etc/pacman.conf"
-            log_adapt "Added Arch's official [core]/[extra] repos as extra pacman sources (via artix-archlinux-support), with a mirrorlist matched to $([[ -n "$REGION" ]] && echo "$REGION" || echo "the fastest available mirrors") — some AUR/community packages depend on things only published there"
+            sudo pacman -Syu
+            ok "Arch's [extra] repository added to /etc/pacman.conf"
+            log_adapt "Added Arch's official [extra] repos as extra pacman sources (via artix-archlinux-support), with a mirrorlist matched to $([[ -n "$REGION" ]] && echo "$REGION" || echo "the fastest available mirrors") — some AUR/community packages depend on things only published there"
         else
             warn "Couldn't confirm mirrorlist-arch was created — skipping the pacman.conf edit. Packages needing Arch's repos may still fail; check https://wiki.artixlinux.org manually."
         fi
@@ -445,7 +520,7 @@ fi
 # AUR packages (built for vanilla Arch) commonly depend on systemd/systemd-libs.
 # On Artix with libelogind this causes a file conflict; the official fix is to
 # install artix-archlinux-support, which provides dummy systemd/systemd-libs.
-if [[ "$DISTRO_FAMILY" == "arch" && "$INIT_SYSTEM" != "systemd" ]] && pacman -Si artix-archlinux-support >/dev/null 2>&1; then
+if [[ "$DISTRO_FAMILY" == "arch" && "$(. /etc/os-release; printf '%s' "$ID")" == artix ]] && pacman -Si artix-archlinux-support >/dev/null 2>&1; then
     step "systemd-libs dummy (Artix)"
     sudo pacman -S --needed --noconfirm artix-archlinux-support
     ok "artix-archlinux-support installed"
@@ -512,7 +587,6 @@ PACKAGES=(
 
     # Spotify theming (needs a one-time manual "spicetify backup apply"
     # after first login — see the summary at the end)
-    spicetify-cli
 
     # screenshots
     grim slurp
@@ -538,13 +612,13 @@ PACKAGES=(
     ttf-jetbrains-mono-nerd noto-fonts-emoji
 
     # GTK theming (materia-dark, applied like nwg-look would)
-    materia-gtk-theme
+    materia-gtk-theme kvantum kvantum-qt5 kvantum-theme-materia
+    xdg-utils xorg-xrdb sway-audio-idle-inhibit
 
     # audio
     pipewire pipewire-pulse pipewire-alsa wireplumber
 
     # bundled apps used by keybinds/autostart
-    discord spotify helium-browser-bin
 
     # GRUB theme (ultragrub)
     wget
@@ -552,6 +626,10 @@ PACKAGES=(
     # waybar tags module (parses mmsg JSON output)
     jq
 )
+
+[[ "$INSTALL_DISCORD" -eq 1 ]] && PACKAGES+=(discord)
+[[ "$INSTALL_SPOTIFY" -eq 1 ]] && PACKAGES+=(spotify spicetify-cli)
+[[ -n "$BROWSER_PACKAGE" ]] && PACKAGES+=("$BROWSER_PACKAGE")
 
 # seat management: mango (via libseat) needs elogind outside of systemd.
 # ly is the display manager on every init system; each one needs its own
@@ -577,12 +655,12 @@ if [[ "$INIT_SYSTEM" != "systemd" ]]; then
     step "Enabling elogind ($INIT_SYSTEM)"
     case "$INIT_SYSTEM" in
         openrc)
-            sudo rc-update add elogind boot || true
-            sudo rc-service elogind start || true
+            sudo rc-update add elogind boot
+            sudo rc-service elogind start
             log_adapt "Enabled elogind in the boot runlevel via rc-update (OpenRC) — needed for mango to access DRM/input through libseat"
             ;;
         dinit)
-            sudo dinitctl enable elogind || true
+            sudo dinitctl enable elogind
             log_adapt "Enabled elogind via dinitctl (dinit) — needed for mango to access DRM/input through libseat"
             ;;
     esac
@@ -605,7 +683,9 @@ Exec=dbus-run-session mango
 Type=Application
 LYEOF
 log_adapt "Created/updated /usr/share/wayland-sessions/mango.desktop (dbus-run-session mango) so display managers can list Mango as a session"
-strip_other_sessions
+if confirm "Hide all login sessions except Mango (with a backup)?"; then
+    strip_other_sessions
+fi
 
 case "$INIT_SYSTEM" in
     systemd)
@@ -666,18 +746,17 @@ case "$INIT_SYSTEM" in
             warn "$CONSOLE_CONF not found or not in the expected format — skipping the console fix, check it by hand if ly crash-loops."
         fi
 
-        sudo dinitctl enable ly || true
+        sudo dinitctl enable ly
         if [[ "${REBOOT_NEEDED_FOR_LY:-0}" -eq 1 ]]; then
             ok "ly enabled (will start after your next reboot, needed for the console change above to take effect)"
         else
-            sudo dinitctl start ly || true
-            ok "ly enabled and started"
+            ok "ly enabled; log out or reboot when ready to use it"
         fi
         log_adapt "Installed ly + ly-dinit and enabled it as the display manager"
         ;;
 
     openrc)
-        sudo rc-update add ly default || true
+        sudo rc-update add ly default
         ok "ly enabled as the display manager (OpenRC)"
         log_adapt "Installed ly + ly-openrc and enabled it as the display manager"
         info "If ly crash-loops with a VT/console error, it's likely the same kind of getty-vs-ly console conflict as on dinit — check what's running on the tty ly wants (usually tty2) with 'rc-status' and free it up in your getty config."
@@ -714,7 +793,7 @@ if [[ "$DISTRO_FAMILY" == "fedora" ]]; then
         xorg-x11-server-Xwayland
         jetbrains-mono-fonts google-noto-emoji-color-fonts
         pipewire pipewire-pulseaudio wireplumber
-        discord
+        kvantum materia-kde-kvantum
         wget jq unzip
     )
 
@@ -783,7 +862,9 @@ Exec=dbus-run-session mango
 Type=Application
 LYEOF
         log_adapt "Created/updated /usr/share/wayland-sessions/mango.desktop (dbus-run-session mango) so display managers can list Mango as a session"
-        strip_other_sessions
+        if confirm "Hide all login sessions except Mango (with a backup)?"; then
+    strip_other_sessions
+fi
         other_dm=""
         for dm in gdm sddm lightdm lxdm; do
             if systemctl is-enabled "${dm}.service" >/dev/null 2>&1; then
@@ -809,23 +890,23 @@ LYEOF
         warn "ly isn't available in your Fedora repos; use GDM/SDDM with the Mango session entry created above, or install ly from source."
     fi
 
-    step "Discord & Spotify (Flatpak)"
-    info "Fedora's repos don't carry Discord/Spotify; the repo's autostart.sh and keybinds expect the 'discord' and 'spotify' commands."
-    if confirm "Install Discord and Spotify through Flatpak?"; then
+    if [[ "$INSTALL_DISCORD" -eq 1 || "$INSTALL_SPOTIFY" -eq 1 ]]; then
         command -v flatpak >/dev/null 2>&1 || sudo dnf install -y flatpak
-        flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
-        flatpak install -y flathub com.discordapp.Discord com.spotify.Client || true
-        mkdir -p "$HOME/.local/bin"
-        printf '#!/bin/sh\nexec flatpak run com.discordapp.Discord "$@"\n' | sudo tee /usr/local/bin/discord >/dev/null
-        printf '#!/bin/sh\nexec flatpak run com.spotify.Client "$@"\n' | sudo tee /usr/local/bin/spotify >/dev/null
-        sudo chmod +x /usr/local/bin/discord /usr/local/bin/spotify
-        log_adapt "Discord and Spotify installed via Flatpak, with /usr/local/bin/discord and /usr/local/bin/spotify wrapper scripts so the repo's existing 'discord'/'spotify' commands keep working unchanged"
-    else
-        warn "Skipped. Install Discord/Spotify yourself and make sure 'discord' and 'spotify' resolve to something, or edit config.conf/autostart.sh."
+        flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+        for app in discord spotify; do
+            [[ "$app" == discord && "$INSTALL_DISCORD" -eq 0 ]] && continue
+            [[ "$app" == spotify && "$INSTALL_SPOTIFY" -eq 0 ]] && continue
+            case "$app" in discord) appid=com.discordapp.Discord ;; spotify) appid=com.spotify.Client ;; esac
+            flatpak install --user -y flathub "$appid"
+            printf '#!/bin/sh\nexec flatpak run %s "$@"\n' "$appid" | sudo tee "/usr/local/bin/$app" >/dev/null
+            sudo chmod +x "/usr/local/bin/$app"
+        done
     fi
-
-    warn "helium-browser has no Fedora package; the repo's helium-browser keybind/autostart line will do nothing until you install it manually or swap it for another browser."
-    warn "wallust and spicetify-cli don't have Fedora packages either — the wallpaper-driven color scheme and Spotify theming won't be set up here. Install them via cargo/pip if you want them (cargo install wallust; spicetify's own install.sh)."
+    if [[ "$BROWSER_COMMAND" == firefox ]]; then
+        sudo dnf install -y firefox
+    elif [[ -n "$BROWSER_COMMAND" ]]; then
+        warn "Install $BROWSER_COMMAND manually on Fedora; automatic browser installation is supported on Arch/Artix/CachyOS."
+    fi
 fi
 
 # ---------- packages: NixOS ----------
@@ -871,7 +952,7 @@ if [[ "$DISTRO_FAMILY" == "nixos" ]]; then
     noto-fonts-emoji
     materia-theme
     pipewire wireplumber
-    discord spotify spicetify-cli
+    # Add optional Discord/Spotify/browser packages yourself on NixOS.
     wget jq
   ];
 }
@@ -916,7 +997,7 @@ WLOGOUT_LAYOUT="$CONFIG_DIR/config/wlogout/layout"
 WLOGOUT_THEME_SCRIPT="$CONFIG_DIR/scripts/wlogout-theme.sh"
 
 # 1) waybar: systemctl -> loginctl (no systemd, running elogind)
-if [[ -f "$WAYBAR_JSONC" ]]; then
+if [[ "$INIT_SYSTEM" != systemd && -f "$WAYBAR_JSONC" ]]; then
     run_sed -i \
         -e 's/systemctl poweroff/loginctl poweroff/' \
         -e 's/systemctl reboot/loginctl reboot/' \
@@ -927,6 +1008,10 @@ fi
 if [[ -d "$CONFIG_DIR/config/wlogout" ]]; then
     mkdir -p "$HOME/.config/wlogout"
     cp "$CONFIG_DIR/config/wlogout/"* "$HOME/.config/wlogout/" 2>/dev/null || true
+    if [[ "$INIT_SYSTEM" == systemd ]]; then
+        sed -i -E 's/loginctl (poweroff|reboot|suspend|hibernate)/systemctl \1/g' "$HOME/.config/wlogout/layout"
+        sed -i -E 's/loginctl (poweroff|reboot|suspend|hibernate)/systemctl \1/g' "$WAYBAR_JSONC"
+    fi
     ok "~/.config/wlogout populated directly from the repo"
 fi
 
@@ -954,7 +1039,7 @@ POLKITEOF
     WALLPAPER_FALLBACK="$(find "$CONFIG_DIR/config" "$CONFIG_DIR/wallpaper" -maxdepth 2 \( -iname 'wallpaper*.png' -o -iname 'wallpaper*.jpg' \) 2>/dev/null | head -1)"
     if grep -qx 'waypaper --restore &' "$AUTOSTART" && ! grep -q 'awww img' "$AUTOSTART" && [[ -n "$WALLPAPER_FALLBACK" ]]; then
         run_sed -i '/^waypaper --restore &$/c\
-if [ -f "$HOME/.config/waypaper/config.ini" ]; then\
+if grep -qE "^wallpaper[[:space:]]*=[[:space:]]*[^[:space:]]" "$HOME/.config/waypaper/config.ini" 2>/dev/null; then\
     waypaper --restore \&\
 else\
     awww img "'"${WALLPAPER_FALLBACK}"'" \&\
@@ -1057,7 +1142,7 @@ fi
 step "Monitor layout (monitor.conf)"
 if [[ -f "$CONFIG_DIR/monitor.conf" ]]; then
     warn "monitor.conf is tuned for DP-1 @165Hz + HDMI-A-1 (the author's setup)."
-    info "Find your output names with 'wlr-randr' (inside a mango session) and edit $CONFIG_DIR/monitor.conf."
+    info "Check Mango output information inside your session and edit $CONFIG_DIR/monitor.conf."
     log_adapt "monitor.conf: kept as shipped (DP-1 @165Hz + HDMI-A-1) — edit the output names/modes for your own monitors"
 else
     warn "monitor.conf not found in this checkout — outputs will use mango's defaults. See mango's docs, Configuration > Monitors (monitor_rule=)."
@@ -1105,15 +1190,15 @@ if [[ -n "${KB_CONSOLE:-}" ]]; then
 fi
 
 
-CURSOR_NAME="$(grep -m1 '^cursor_theme=' "$CONFIG_DIR/config.conf" 2>/dev/null | cut -d= -f2)"
+CURSOR_NAME="$(grep -m1 '^cursor_theme=' "$CONFIG_DIR/config.conf" 2>/dev/null | cut -d= -f2 || true)"
 CURSOR_NAME="${CURSOR_NAME:-Samuel-Noticias-Cursor}"
 
-step "GTK theme (Materia-dark)"
+step "GTK theme (Materia-dark-compact)"
 mkdir -p "$HOME/.config/gtk-3.0" "$HOME/.config/gtk-4.0"
 for gtk_ini in "$HOME/.config/gtk-3.0/settings.ini" "$HOME/.config/gtk-4.0/settings.ini"; do
     cat > "$gtk_ini" <<GTKEOF
 [Settings]
-gtk-theme-name=Materia-dark
+gtk-theme-name=Materia-dark-compact
 gtk-icon-theme-name=Adwaita
 gtk-cursor-theme-name=${CURSOR_NAME}
 gtk-cursor-theme-size=24
@@ -1121,15 +1206,57 @@ gtk-application-prefer-dark-theme=1
 GTKEOF
 done
 cat > "$HOME/.gtkrc-2.0" <<GTK2EOF
-gtk-theme-name="Materia-dark"
+gtk-theme-name="Materia-dark-compact"
 gtk-cursor-theme-name="${CURSOR_NAME}"
 gtk-cursor-theme-size=24
 GTK2EOF
 if [[ -f "$AUTOSTART" ]] && ! grep -q "GTK_THEME" "$AUTOSTART"; then
-    run_sed -i '/^export XCURSOR_THEME=/i export GTK_THEME=Materia-dark:dark' "$AUTOSTART"
+    run_sed -i '/^export XCURSOR_THEME=/i export GTK_THEME=Materia-dark-compact' "$AUTOSTART"
 fi
 ok "gtk-3.0/gtk-4.0 settings.ini and ~/.gtkrc-2.0 written"
-log_adapt "GTK theme: applied Materia-dark the same way nwg-look would (gtk-3.0/gtk-4.0 settings.ini + ~/.gtkrc-2.0 + GTK_THEME env var), together with the $CURSOR_NAME cursor"
+log_adapt "GTK theme: applied Materia-dark-compact the same way nwg-look would (gtk-3.0/gtk-4.0 settings.ini + ~/.gtkrc-2.0 + GTK_THEME env var), together with the $CURSOR_NAME cursor"
+
+# Qt widgets (Ark, qBittorrent) need a Qt style, not just a GTK setting.
+mkdir -p "$HOME/.config/Kvantum"
+printf '[General]\ntheme=MateriaDark\n' > "$HOME/.config/Kvantum/kvantum.kvconfig"
+if [[ ! -f /usr/share/Kvantum/MateriaDark/MateriaDark.kvconfig ]]; then
+    warn "MateriaDark for Kvantum is missing. Install kvantum, kvantum-qt5 and kvantum-theme-materia on Arch/Artix/CachyOS."
+fi
+if command -v gsettings >/dev/null 2>&1; then
+    gsettings get org.gnome.desktop.interface gtk-theme > "$BACKUP_DIR/gtk-theme.gsettings" 2>/dev/null || true
+    gsettings get org.gnome.desktop.interface color-scheme > "$BACKUP_DIR/color-scheme.gsettings" 2>/dev/null || true
+    gsettings set org.gnome.desktop.interface gtk-theme Materia-dark-compact || warn "Could not set GTK theme through GSettings."
+    gsettings set org.gnome.desktop.interface color-scheme prefer-dark || warn "Could not set dark preference through GSettings."
+fi
+if [[ -f "$CONFIG_DIR/env.conf" ]]; then
+    sed -i '/^env=GTK_THEME,/d; /^env=QT_STYLE_OVERRIDE,/d' "$CONFIG_DIR/env.conf"
+    printf '\nenv=GTK_THEME,Materia-dark-compact\nenv=QT_STYLE_OVERRIDE,kvantum\n' >> "$CONFIG_DIR/env.conf"
+fi
+sed -i '/^export QT_QPA_PLATFORMTHEME=gtk3$/d' "$AUTOSTART"
+if ! grep -q '^export QT_STYLE_OVERRIDE=' "$AUTOSTART"; then
+    sed -i '/^export XCURSOR_THEME=/i export QT_STYLE_OVERRIDE=kvantum' "$AUTOSTART"
+fi
+# Always rewrite managed app choices, so rerunning can turn apps off again.
+cat > "$CONFIG_DIR/apps.conf" <<APPS
+INSTALL_DISCORD=$INSTALL_DISCORD
+INSTALL_SPOTIFY=$INSTALL_SPOTIFY
+START_DISCORD=$START_DISCORD
+START_SPOTIFY=$START_SPOTIFY
+START_BROWSER=$START_BROWSER
+BROWSER_COMMAND=$BROWSER_COMMAND
+APPS
+sed -i '/^bind=SUPER,w,spawn,/d; /^bind=SUPER,a,spawn,/d; /^bind=SUPER,s,spawn,/d' "$CONFIG_DIR/bind.conf"
+[[ -n "$BROWSER_COMMAND" ]] && printf 'bind=SUPER,w,spawn,%s\n' "$BROWSER_COMMAND" >> "$CONFIG_DIR/bind.conf"
+[[ "$INSTALL_DISCORD" -eq 1 ]] && printf 'bind=SUPER,a,spawn,discord --ozone-platform=wayland\n' >> "$CONFIG_DIR/bind.conf"
+[[ "$INSTALL_SPOTIFY" -eq 1 ]] && printf 'bind=SUPER,s,spawn,spotify\n' >> "$CONFIG_DIR/bind.conf"
+if [[ -n "$BROWSER_DESKTOP" ]] && command -v xdg-settings >/dev/null 2>&1; then
+    if [[ -f "/usr/share/applications/$BROWSER_DESKTOP" ]]; then
+        xdg-settings set default-web-browser "$BROWSER_DESKTOP" || warn "Set your default browser manually with xdg-settings."
+    else
+        warn "Browser desktop entry $BROWSER_DESKTOP not found; SUPER+W is configured, but the system browser default was not changed."
+    fi
+fi
+info "Log out and back in to apply GTK/Qt settings to the whole Mango session."
 
 # ---------- fastfetch (outside ~/.config/mango) ----------
 step "Configuring fastfetch"
@@ -1318,13 +1445,14 @@ fi
 if [[ "$HEALTH_OK" -eq 1 ]]; then
     ok "Everything checks out"
 else
-    warn "Some things above are missing — scroll up for what failed, or just re-run the script; it's safe to run more than once."
+    warn "Some things above are missing — scroll up for what failed, review the errors and your backups before re-running."
 fi
 
 # ---------- summary ----------
 echo
 box "Done — welcome to Mango" "$c_green"
 info "Init system: $INIT_SYSTEM"
+info "Configuration backup: $BACKUP_DIR"
 if [[ "${#ADAPTATIONS[@]}" -gt 0 ]]; then
     printf "\n${c_bold}${c_mauve}Adaptations made${c_reset} ${c_sub}(the original repo had these broken or incomplete)${c_reset}\n"
     for a in "${ADAPTATIONS[@]}"; do
@@ -1332,10 +1460,10 @@ if [[ "${#ADAPTATIONS[@]}" -gt 0 ]]; then
     done
 fi
 printf "\n${c_bold}${c_yellow}Worth double-checking by hand${c_reset}\n"
-info "monitor.conf: shipped with DP-1 @165Hz + HDMI-A-1 — edit the output names/modes there for your own monitors (wlr-randr lists them)"
+info "monitor.conf: shipped with DP-1 @165Hz + HDMI-A-1 — edit the output names/modes there for your own monitors (check Mango output information inside your session)"
 info "The cursor theme name in config.conf (cursor_theme=) — see the warning above if that theme isn't installed"
 info "Pick a wallpaper with SUPER+F (waypaper) any time you want to change it — wallust will regenerate colors automatically from then on"
-info "Spicetify: autostart.sh runs 'spicetify backup apply' every login, but that needs one manual first-time setup after logging into Spotify — run 'spicetify backup apply' yourself once, following spicetify's own setup guide, before it'll do anything on autostart"
+# info "Spicetify: autostart.sh runs 'spicetify backup apply' every login, but that needs one manual first-time setup after logging into Spotify — run 'spicetify backup apply' yourself once, following spicetify's own setup guide, before it'll do anything on autostart"
 echo
 printf "${c_bold}${c_blue}To start:${c_reset} log in on a TTY and run '%bmango%b', or pick Mango from ly's session list.\n" "$c_mauve" "$c_reset"
 echo
