@@ -2,8 +2,11 @@
 {
     "layer": "top",
     "position": "top",
-    "height": 28,
-    "spacing": 0,
+    "height": 34,
+    "margin-top": 8,
+    "margin-left": 10,
+    "margin-right": 10,
+    "spacing": 2,
 
     "modules-left": [
         "mango/workspaces",

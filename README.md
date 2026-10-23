@@ -15,7 +15,7 @@ https://github.com/user-attachments/assets/cb902017-0d69-4222-970d-5467773197c4
 - **Logout menu:** wlogout, themed
 - **Wallpaper:** waypaper (SUPER+F), with a bundled fallback wallpaper for the first boot
 - **Multi-monitor:** native `monitor_rule=` lines in `monitor.conf` (mango doesn't implement `wlr-output-management`, so kanshi/wlr-randr can't be used). The file ships with the author's monitors (DP-1 @165 Hz + HDMI-A-1) — edit the output names/modes for your own setup
-- **Wallpaper-driven colors:** wallust regenerates `colors.conf` (mango borders) and `waybar/colors.css` every time waypaper changes the wallpaper; mango hot-reloads on its own (`auto_reload_config`)
+- **Wallpaper-driven colors:** wallust regenerates `colors.conf` (mango borders), `waybar/colors.css` and Fish/terminal colors every time waypaper changes the wallpaper; mango hot-reloads on its own (`auto_reload_config`)
 - **Keyboard layout:** picked from a short menu during install and applied both to mango (`xkb_rules_layout`/`xkb_rules_variant`) and to the raw console (`/etc/vconsole.conf`), so it's consistent whether you're at a bare TTY or inside the graphical session
 - **GTK theming:** Materia-dark-compact applied the same way `nwg-look` would (gtk-3.0/gtk-4.0 `settings.ini`, `~/.gtkrc-2.0`, `GTK_THEME` env var)
 - **Shell:** fish, with the greeting disabled and fastfetch shown on every new terminal
@@ -186,3 +186,43 @@ Wallust prefers HDMI-A-1 as before, but falls back to another active wallpaper i
 that output is absent. Set `VICTORIA_COLOR_MONITOR` to choose another preferred output.
 Spicetify is now applied manually after Spotify updates, rather than restoring and
 patching Spotify on every login.
+
+
+## Wallpaper palette and visual refresh
+
+Waybar uses three floating groups with consistent padding, a subtle outline and
+readable foreground text. Active workspaces and controls inherit the wallpaper
+accent. Mango keeps its layouts and animations with 12px corners, 10px outer gaps
+and 96% inactive-window opacity. Kitty uses 88% opacity and 10px padding.
+
+The installer copies all Wallust templates into `~/.config/wallust/templates`,
+sets Waypaper to `awww`, and generates the initial palette **during installation**.
+It uses the saved wallpaper (preferring HDMI-A-1), including Waypaper's XDG state
+file, or `wallpaper/wallpaper.jpg` on a fresh setup. No running compositor is needed
+for that first generation. The managed config targets Wallust **3.x**, validated
+in CI with 3.5.1: `backend = "kmeans"`, `palette = "dark"`, `check_contrast = true`.
+
+The Fish loader lives in `~/.config/fish/conf.d/victoria-wallust.fish`; your prompt,
+PATH and `config.fish` are preserved. Terminal background/foreground/ANSI colors
+and Fish syntax/prompt variables follow the wallpaper. New terminals load the
+palette immediately; open Fish sessions refresh **at the next prompt**. Prompts
+with their own hardcoded RGB colors may override the Fish color variables.
+
+At login, `scripts/wallpaper-start.sh` waits for awww, restores Waypaper and
+synchronizes the palette. On wallpaper changes, the post-command uses
+`scripts/wallust-reload.sh`. It serializes updates, renders into staging, checks
+all outputs, and only then publishes the generated files and Fish cache. A failed
+or incomplete Wallust render keeps the last complete palette. Existing unrelated
+Waypaper post-commands are retained; an empty or old Victoria hook is repaired.
+
+To regenerate manually (after configuration has been installed):
+
+```bash
+bash ~/.config/mango/scripts/wallust-reload.sh
+```
+
+Diagnostics: `${XDG_CACHE_HOME:-$HOME/.cache}/wallust/victoria.log`.
+The automated tests cover setup, saved/active/missing monitors, XDG state, repeated
+installation, custom hooks, failed rendering and native GTK CSS parsing. CI also
+runs the real Wallust renderer and Fish loader. Full compositor/DM installation
+and screenshot-level validation still require a real desktop session.

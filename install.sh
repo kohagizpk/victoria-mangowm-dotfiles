@@ -310,6 +310,9 @@ for relative in .config/mango .config/wlogout .config/xdg-desktop-portal \
         cp -a "$HOME/$relative" "$BACKUP_DIR/$relative"
     fi
 done
+if [[ -d "${XDG_STATE_HOME:-$HOME/.local/state}/waypaper" ]]; then
+    cp -a "${XDG_STATE_HOME:-$HOME/.local/state}/waypaper" "$BACKUP_DIR/waypaper-state"
+fi
 info "Configuration backup: $BACKUP_DIR"
 
 # ---------- where are the dotfiles, and where should they end up? ----------
@@ -583,7 +586,7 @@ PACKAGES=(
     awww waypaper
 
     # wallpaper-driven color scheme (wallust) + the two things it re-colors
-    wallust cava
+    wallust cava python
 
     # Spotify theming (needs a one-time manual "spicetify backup apply"
     # after first login — see the summary at the end)
@@ -784,7 +787,7 @@ if [[ "$DISTRO_FAMILY" == "fedora" ]]; then
         mangowm
         waybar rofi fuzzel foot kitty fish fastfetch
         nemo pavucontrol nwg-look
-        awww waypaper cava
+        awww waypaper cava python3
         grim slurp
         dunst swaync libnotify
         swayosd brightnessctl pamixer swayidle
@@ -941,7 +944,7 @@ if [[ "$DISTRO_FAMILY" == "nixos" ]]; then
     waybar rofi fuzzel foot kitty fish fastfetch
     nemo pavucontrol nwg-look
     awww waypaper
-    wallust cava
+    wallust cava python3
     grim slurp
     dunst swaync libnotify
     swayosd brightnessctl pamixer swayidle swaylock-effects
@@ -1036,19 +1039,6 @@ POLKITEOF
         log_adapt "autostart.sh: added a polkit agent startup (xfce-polkit) — nothing was providing GUI privilege prompts before"
     fi
 
-    WALLPAPER_FALLBACK="$(find "$CONFIG_DIR/config" "$CONFIG_DIR/wallpaper" -maxdepth 2 \( -iname 'wallpaper*.png' -o -iname 'wallpaper*.jpg' \) 2>/dev/null | head -1)"
-    if grep -qx 'waypaper --restore &' "$AUTOSTART" && ! grep -q 'awww img' "$AUTOSTART" && [[ -n "$WALLPAPER_FALLBACK" ]]; then
-        run_sed -i '/^waypaper --restore &$/c\
-if grep -qE "^wallpaper[[:space:]]*=[[:space:]]*[^[:space:]]" "$HOME/.config/waypaper/config.ini" 2>/dev/null; then\
-    waypaper --restore \&\
-else\
-    awww img "'"${WALLPAPER_FALLBACK}"'" \&\
-fi' "$AUTOSTART"
-        log_adapt "autostart.sh: waypaper --restore does nothing on a fresh install (no saved state yet) -> falls back to 'awww img' with a bundled wallpaper so you get one immediately (swaybg isn't the backend here anymore, awww is)"
-    elif [[ -z "$WALLPAPER_FALLBACK" ]]; then
-        info "No wallpaper image bundled in the repo right now, so no fallback was set up — the desktop will have no wallpaper until you pick one with SUPER+F (waypaper)."
-    fi
-
     if [[ "$INIT_SYSTEM" == "systemd" ]]; then
         run_sed -i 's/^dbus-update-activation-environment \\$/dbus-update-activation-environment --systemd \\/' "$AUTOSTART"
         log_adapt "autostart.sh: added --systemd to dbus-update-activation-environment (you're on systemd, this also propagates the env vars to systemd --user)"
@@ -1092,45 +1082,24 @@ else
     warn "Couldn't auto-detect the sensor. Set 'hwmon-path' in $WAYBAR_JSONC by hand (run 'sensors' or check /sys/class/hwmon/*/name)."
 fi
 
-# ---------- wallust (wallpaper-driven colors for mango + waybar) ----------
-step "Wallust color scheme"
-WALLUST_TOML_SRC="$CONFIG_DIR/config/wallust/wallust.toml"
-WALLUST_TEMPLATE_SRC="$CONFIG_DIR/config/wallust/templates/mango-colors.conf"
-if [[ -f "$WALLUST_TOML_SRC" ]]; then
-    mkdir -p "$HOME/.config/wallust/templates"
-    cp "$WALLUST_TOML_SRC" "$HOME/.config/wallust/wallust.toml"
-    [[ -f "$WALLUST_TEMPLATE_SRC" ]] && cp "$WALLUST_TEMPLATE_SRC" "$HOME/.config/wallust/templates/mango-colors.conf"
-    ok "~/.config/wallust/wallust.toml deployed"
-
-    # Wire wallust-reload.sh into waypaper so a wallpaper change regenerates
-    # colors.css/colors.conf automatically, instead of leaving the repo's
-    # bundled fallback palette in place forever.
-    mkdir -p "$HOME/.config/waypaper"
-    WAYPAPER_INI="$HOME/.config/waypaper/config.ini"
-    POST_CMD="$CONFIG_DIR/scripts/wallust-reload.sh"
-    if [[ ! -f "$WAYPAPER_INI" ]]; then
-        printf '[Settings]\npost_command = %s\n' "$POST_CMD" | write_to "$WAYPAPER_INI"
-        log_adapt "Created ~/.config/waypaper/config.ini with post_command pointing at scripts/wallust-reload.sh, so picking a new wallpaper regenerates the mango/waybar colors automatically"
-    elif ! grep -q '^post_command' "$WAYPAPER_INI"; then
-        run_sed -i "/^\[Settings\]/a post_command = ${POST_CMD}" "$WAYPAPER_INI"
-        log_adapt "Added post_command to the existing ~/.config/waypaper/config.ini, pointing at scripts/wallust-reload.sh"
-    else
-        info "~/.config/waypaper/config.ini already has a post_command set — left it alone, checking it still points at scripts/wallust-reload.sh is on you if you changed it."
-    fi
-
-    # Generate real colors for whatever wallpaper actually ends up in use,
-    # instead of relying on the bundled fallback palette (a dark red) forever.
-    if command -v wallust >/dev/null 2>&1 && [[ -n "${WALLPAPER_FALLBACK:-}" ]]; then
-        if [[ "$DRY_RUN" -eq 1 ]]; then
-            printf "  ${c_dim}would run:${c_reset} wallust run %s\n" "$WALLPAPER_FALLBACK"
-        else
-            wallust run "$WALLPAPER_FALLBACK" >/dev/null 2>&1 || warn "wallust run failed — the bundled fallback colors are still in place, run it by hand later."
-        fi
-    fi
-else
-    warn "config/wallust/wallust.toml not found in this checkout — wallust won't be configured."
-    info "Add wallust.toml to config/wallust/ and the mango-colors.conf template to config/wallust/templates/ in the repo, and this step will pick them up next run."
+# ---------- wallust: Waybar, Mango borders and Fish ----------
+step "Wallpaper colors (Wallust)"
+if ! command -v python3 >/dev/null 2>&1; then
+    err "python3 is required to configure Wallust and Waypaper. Install it and rerun."
+    exit 1
 fi
+# Existing user configuration was backed up before deployment.
+WALLPAPER_FALLBACK="$(python3 "$CONFIG_DIR/scripts/theme.py" setup)"
+if command -v wallust >/dev/null 2>&1; then
+    if ! bash "$CONFIG_DIR/scripts/wallust-reload.sh" --install "$WALLPAPER_FALLBACK"; then
+        err "Initial palette generation failed. See ${XDG_CACHE_HOME:-$HOME/.cache}/wallust/victoria.log."
+        exit 1
+    fi
+    ok "Wallpaper palette generated for Waybar, Mango borders and Fish"
+else
+    warn "Wallust is not installed yet. Configurations are ready; generate the palette after installing it."
+fi
+log_adapt "Installed Wallust templates, Waypaper's awww hook and Fish palette loader; first palette uses the saved wallpaper or a bundled image."
 
 # ---------- monitors: monitor.conf (fixed rules) ----------
 # monitor.conf ships with the repo author's two monitors (DP-1 @165Hz + HDMI-A-1).
@@ -1308,7 +1277,8 @@ step "Configuring kitty"
 mkdir -p "$HOME/.config/kitty"
 cat > "$HOME/.config/kitty/kitty.conf" <<'KITTYEOF'
 shell fish
-background_opacity 0.6
+background_opacity 0.88
+window_padding_width 10
 font_size 13
 font_family JetBrainsMono Nerd Font
 KITTYEOF
@@ -1438,6 +1408,8 @@ else
     check_cmd kitty
     check_cmd fish
     check_cmd mmsg
+    check_cmd wallust
+    check_file "${XDG_CACHE_HOME:-$HOME/.cache}/wallust/victoria-generation" "Wallust palette generated"
     check_file "$CONFIG_DIR/config.conf" "config.conf deployed"
     check_file "$HOME/.config/wlogout/layout" "wlogout theme deployed"
     check_file "$HOME/.local/share/icons/$CURSOR_NAME" "cursor theme installed"

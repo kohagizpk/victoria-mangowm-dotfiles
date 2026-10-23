@@ -40,10 +40,7 @@ sleep 0.8
 [ -f "$HOME/.local/bin/fix-volume.sh" ] && bash "$HOME/.local/bin/fix-volume.sh"
 
 # ---------- Wallpaper (awww + waypaper; o wallust roda via post_command) ----------
-awww-daemon &
-sleep 0.5
-waypaper --restore &
-sleep 1
+bash "$HOME/.config/mango/scripts/wallpaper-start.sh" &
 
 # ---------- Barra, notificações e OSD ----------
 bash ~/.config/mango/scripts/waybar-launch.sh &
