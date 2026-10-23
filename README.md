@@ -14,13 +14,13 @@ https://github.com/user-attachments/assets/cb902017-0d69-4222-970d-5467773197c4
 - **Screenshots:** grim + slurp
 - **Logout menu:** wlogout, themed
 - **Wallpaper:** waypaper (SUPER+F), with a bundled fallback wallpaper for the first boot
-- **Multi-monitor:** native `monitor_rule=` lines in `monitor.conf` (mango doesn't implement `wlr-output-management`, so kanshi/wlr-randr can't be used). The file ships with the author's monitors (DP-1 @165 Hz + HDMI-A-1) — edit the output names/modes for your own setup
+- **Multi-monitor:** installation detects connected Linux DRM outputs and writes native `monitor_rule=` lines to `monitor.conf`, including from a TTY. Uses the preferred resolution and highest advertised refresh at that resolution when DRM access is available; otherwise lets Mango choose the mode. Personal rules in `local/monitor.conf` take precedence.
 - **Wallpaper-driven colors:** wallust regenerates `colors.conf` (mango borders), `waybar/colors.css` and Fish/terminal colors every time waypaper changes the wallpaper; mango hot-reloads on its own (`auto_reload_config`)
 - **Keyboard layout:** picked from a short menu during install and applied both to mango (`xkb_rules_layout`/`xkb_rules_variant`) and to the raw console (`/etc/vconsole.conf`), so it's consistent whether you're at a bare TTY or inside the graphical session
 - **GTK theming:** Materia-dark-compact applied the same way `nwg-look` would (gtk-3.0/gtk-4.0 `settings.ini`, `~/.gtkrc-2.0`, `GTK_THEME` env var)
 - **Shell:** fish, with the greeting disabled and fastfetch shown on every new terminal
 - **Terminal:** kitty
-- **Cursor theme:** whatever `cursor_theme=` says in `config.conf` (currently `Samuel-Noticias-Cursor`). If a folder with that name exists in `themes/`, the installer copies it to `~/.local/share/icons`; otherwise it only checks that the theme is installed
+- **Cursor theme:** bundled **Animated-Mew-Cursor**, installed in `~/.local/share/icons` in both installation modes. An existing selection is preserved when its theme is available; missing themes fall back to the bundled cursor. Mango and its session environment use the same selection.
 - **Bootloader theming (optional):** UltraGrub GRUB theme, plus a patch that cleans up boot entries (e.g. tidies the Windows entry for dual-boot)
 - **Display manager (optional):** [ly](https://github.com/fairyglade/ly), the default DM; hiding other sessions is an explicit opt-in with a backup
 - **Discord screen sharing** wired up correctly (`--ozone-platform=wayland` + PipeWire capturer) wherever Discord gets launched from
@@ -97,7 +97,7 @@ The script is interactive: it walks you through a few quick choices up front (ke
 5. Performs a full `pacman -Syu` upgrade, avoiding partial upgrades. On an Arch-based distro without Arch's own `[extra]` repos (Artix, mainly), offers to add them with a mirrorlist matched to your region.
 6. Installs everything: the compositor, Waybar, launchers, portals, the PipeWire audio stack, GTK theming, fonts (including real Nerd Font icon glyphs, even on Fedora where the packaged font doesn't have them), and bundled apps.
 7. Deploys the dotfiles to `~/.config/mango` and adapts the few things that depend on your machine (elogind instead of systemd, a first-run wallpaper fallback, portals, your keyboard layout...). Every adaptation is logged and printed in the summary at the end.
-8. Auto-detects your CPU temperature sensor and wires it into the Waybar config. (Monitors are **not** auto-detected: edit `monitor.conf`.)
+8. Auto-detects your CPU temperature sensor for Waybar and connected monitors for `monitor.conf`. Places screens side by side from `0,0`, with the laptop panel first when present; preserves personal monitor rules.
 9. Sets up the default display manager (`ly`), asks whether to hide other sessions, the cursor theme, and — optionally — the GRUB theme, your default shell, and the `video` group permission brightness control needs.
 10. Runs a health check at the end and tells you plainly if anything's missing.
 
@@ -132,12 +132,21 @@ Use the full interactive installer for GTK/Kvantum setup and package choices.
 Wallust refreshes Waybar, borders, Fish, Rofi, Fuzzel and wlogout; missing Wallust leaves fallback colors and an actionable warning.
 See [maintenance and personal overrides](docs/maintenance.md).
 
-## Known issues
+## Known issues and validation limits
 
-- `themes/Animated-Mew-Cursor/index.theme` and `cursor.theme` are currently saved as rich-text documents instead of plain text (probably edited in a word processor by accident). The actual cursor files still work, but GTK apps may not list the theme correctly until these two are re-saved as plain text.
-- `monitor.conf` is tuned for the author's two monitors; on any other machine edit the output names/modes (inspect the output information in your Mango session) or mango falls back to each output's preferred mode.
-- `cursor_theme=Samuel-Noticias-Cursor` isn't bundled in the repo (only the old `themes/Animated-Mew-Cursor` is). Drop the theme folder into `themes/Samuel-Noticias-Cursor/` and the installer will install it, or install it yourself under `~/.local/share/icons/`.
-- `install.sh` may still not behave perfectly on every machine — read its output carefully, it logs every adaptation it makes, and review your configuration backups before running it again.
+The concrete configuration issues from the previous list are addressed:
+
+- Monitor rules are generated for detected hardware, instead of shipping the author's two outputs. Legacy untouched defaults are migrated; edited personal layouts are preserved and loaded first because Mango uses the first matching monitor rule.
+- The cursor default now refers to the bundled Animated Mew theme. Its `index.theme` and `cursor.theme` were already plain-text INI files; regression tests now verify this and the stale warning has been removed.
+- App rules no longer require DP-1/HDMI-A-1, and XWayland's default DPI now matches the generated scale of 1.
+
+Remaining limits:
+
+- Without permission to read DRM modes or without `libdrm.so.2`, sysfs supplies connector names and preferred sizes for placement; the compositor selects the mode/refresh. No fabricated timings or overclocking are applied. With no readable connected outputs, no monitor rules are forced.
+- Duplicate connector names across GPUs are skipped rather than guessed; configure those setups manually. Physical left/right order, rotation and desired scaling cannot be inferred from connector names: use `local/monitor.conf`. Detection runs during installation/update, not continuously when a monitor is plugged in.
+- Full package installation, Ly login and the resulting Mango session still need testing on real Arch/Artix/CachyOS hardware. Fedora/NixOS remain experimental. Automated tests do not replace this validation.
+
+See [monitor setup and maintenance](docs/maintenance.md) for preview and regeneration commands.
 
 ## Credits
 

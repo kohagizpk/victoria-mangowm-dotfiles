@@ -10,6 +10,9 @@ import sys
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / 'scripts'))
+import monitors
+
 HOME = Path.home()
 CONFIG = HOME / '.config'
 MANGO = CONFIG / 'mango'
@@ -25,6 +28,8 @@ MAPPING = {
 def copy(source, target):
     if source.is_dir():
         for item in source.iterdir():
+            if item.name == '__pycache__':
+                continue
             copy(item, target / item.name)
     else:
         # Never follow a destination symlink into unrelated user files.
@@ -59,10 +64,17 @@ def stage(target, config_only=False):
         if not path.exists():
             path.write_text('# Personal overrides; preserved by the installer.\n')
             if name == 'monitor.conf' and (MANGO / 'monitor.conf').is_file():
-                copy(MANGO / 'monitor.conf', path)
+                previous = (MANGO / 'monitor.conf').read_text()
+                if not previous.startswith(monitors.MARKER) and not monitors.legacy_defaults(previous):
+                    copy(MANGO / 'monitor.conf', path)
             if name == 'input.conf' and config_only and (MANGO / 'config.conf').is_file():
                 lines = (MANGO / 'config.conf').read_text().splitlines()
                 path.write_text('\n'.join(line for line in lines if re.match(r'^\s*(xkb_rules_\w+|repeat_rate|repeat_delay|numlock_on)\s*=', line)) + '\n')
+    # Older deployments migrated the author's hardcoded pair into local overrides.
+    # Remove only that exact untouched pair, never an edited personal layout.
+    if monitors.legacy_defaults((local / 'monitor.conf').read_text()):
+        (local / 'monitor.conf').write_text('# Personal monitor rules; preserved by the installer.\n')
+    monitors.configure(target / 'monitor.conf')
     if config_only:
         for name in ('apps.conf', 'bind.conf', 'env.conf', 'waybar/config.jsonc'):
             if (MANGO / name).is_file():
@@ -70,6 +82,30 @@ def stage(target, config_only=False):
 
         bar = target / 'waybar/config.jsonc'
         bar.write_text(bar.read_text().replace('WaybarCava.sh', 'waybar-cava.sh'))
+    configure_cursor(target)
+
+
+def configure_cursor(target):
+    """Preserve an available selected cursor; use the bundled theme otherwise."""
+    selected = 'Animated-Mew-Cursor'
+    previous = MANGO / 'config.conf'
+    if previous.is_file():
+        match = re.search(r'^cursor_theme=([A-Za-z0-9_. -]+)$', previous.read_text(), re.M)
+        if match and match[1] not in ('.', '..'):
+            candidate = match[1]
+            roots = [ROOT / 'themes', HOME / '.local/share/icons', HOME / '.icons', Path('/usr/share/icons')]
+            if any((root / candidate / 'cursors').is_dir() for root in roots):
+                selected = candidate
+    for name, pattern, value in (
+        ('config.conf', r'^cursor_theme=.*$', f'cursor_theme={selected}'),
+        ('env.conf', r'^env=XCURSOR_THEME,.*$', f'env=XCURSOR_THEME,{selected}'),
+        ('autostart.sh', r'^export XCURSOR_THEME=.*$', f'export XCURSOR_THEME="{selected}"'),
+    ):
+        path = target / name
+        text, count = re.subn(pattern, lambda _: value, path.read_text(), flags=re.M)
+        if not count:
+            text += '\n' + value + '\n'
+        path.write_text(text)
 
 
 def install():
@@ -81,11 +117,15 @@ def install():
             source = CONFIG / name
             if source.exists():
                 shutil.copytree(source, backup / '.config' / name, symlinks=True)
+        icons = HOME / '.local/share/icons/Animated-Mew-Cursor'
+        if icons.exists():
+            shutil.copytree(icons, backup / '.local/share/icons/Animated-Mew-Cursor', symlinks=True)
         state = Path(os.environ.get('XDG_STATE_HOME') or HOME / '.local/state') / 'waypaper'
         if state.exists():
             shutil.copytree(state, backup / 'waypaper-state', symlinks=True)
         print(f'Backup: {backup}', flush=True)
         copy(staged, MANGO)
+        copy(ROOT / 'themes/Animated-Mew-Cursor', icons)
         # Existing app preferences stay untouched; only new installations get defaults.
         for source, destination in (
             ('config/kitty/kitty.conf', 'kitty/kitty.conf'),

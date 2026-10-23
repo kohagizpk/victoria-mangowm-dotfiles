@@ -4,7 +4,7 @@
 # ---------- Ambiente ----------
 export GTK_THEME=Materia-dark-compact
 export QT_STYLE_OVERRIDE=kvantum
-export XCURSOR_THEME=Samuel-Noticias-Cursor
+export XCURSOR_THEME=Animated-Mew-Cursor
 export XCURSOR_SIZE=24
 export XDG_CURRENT_DESKTOP=wlroots
 export XDG_SESSION_TYPE=wayland
@@ -62,7 +62,8 @@ fi
 sway-audio-idle-inhibit >/dev/null 2>&1 &
 
 # ---------- DPI do XWayland ----------
-echo "Xft.dpi: 140" | xrdb -merge
+# Scale 1 is the portable default; customize DPI if needed.
+echo "Xft.dpi: 96" | xrdb -merge
 
 # ---------- Apps (chosen by install.sh) ----------
 if [ -r "$HOME/.config/mango/apps.conf" ]; then
