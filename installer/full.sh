@@ -41,7 +41,7 @@ Primary targets: Arch Linux, Artix and CachyOS; Fedora/NixOS experimental.
 4. Back up existing desktop configuration before deploying any files.
 5. Upgrade Arch-family packages with pacman -Syu, then install dependencies.
 6. Configure Ly; ask before hiding any other login sessions.
-7. Deploy Mango, Waybar, wallpaper hooks and selected application bindings.
+7. Deploy Mango, detect connected monitors, configure wallpaper hooks and app bindings.
 8. Apply Materia-dark-compact (GTK) and MateriaDark via Kvantum (Qt 5/6).
 9. Offer GRUB theme, fish default shell and brightness permissions.
 10. Check installed commands and report missing components.

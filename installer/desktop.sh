@@ -133,21 +133,10 @@ else
 fi
 log_adapt "Installed Wallust templates, Waypaper's awww hook and Fish palette loader; first palette uses the saved wallpaper or a bundled image."
 
-# ---------- monitors: monitor.conf (fixed rules) ----------
-# monitor.conf ships with the repo author's two monitors (DP-1 @165Hz + HDMI-A-1).
-# mango has no way to auto-detect outputs before the session starts, and
-# kanshi / wlr-randr don't work here (mango doesn't implement
-# wlr-output-management), so on any other machine the rules just need the
-# right output names. Outputs with no matching rule still work (mango picks
-# their preferred mode), they just aren't positioned.
-step "Monitor layout (monitor.conf)"
-if [[ -f "$CONFIG_DIR/monitor.conf" ]]; then
-    warn "monitor.conf is tuned for DP-1 @165Hz + HDMI-A-1 (the author's setup)."
-    info "Check Mango output information inside your session and edit $CONFIG_DIR/local/monitor.conf."
-    log_adapt "monitor.conf: kept as shipped (DP-1 @165Hz + HDMI-A-1) — edit the output names/modes for your own monitors"
-else
-    warn "monitor.conf not found in this checkout — outputs will use mango's defaults. See mango's docs, Configuration > Monitors (monitor_rule=)."
-fi
+# ---------- monitors: generated native Mango rules ----------
+step "Detecting connected monitors"
+python3 "$CONFIG_DIR/scripts/monitors.py" --output "$CONFIG_DIR/monitor.conf"
+log_adapt "monitor.conf: detected DRM outputs, preferred resolution and highest advertised refresh at that resolution; personal rules take precedence."
 
 # ---------- keyboard layout (asked earlier, applied now) ----------
 
@@ -196,7 +185,7 @@ fi
 
 
 CURSOR_NAME="$(grep -m1 '^cursor_theme=' "$CONFIG_DIR/config.conf" 2>/dev/null | cut -d= -f2 || true)"
-CURSOR_NAME="${CURSOR_NAME:-Samuel-Noticias-Cursor}"
+CURSOR_NAME="${CURSOR_NAME:-Animated-Mew-Cursor}"
 
 step "GTK theme (Materia-dark-compact)"
 mkdir -p "$HOME/.config/gtk-3.0" "$HOME/.config/gtk-4.0"
@@ -462,7 +451,7 @@ if [[ "${#ADAPTATIONS[@]}" -gt 0 ]]; then
     done
 fi
 printf "\n${c_bold}${c_yellow}Worth double-checking by hand${c_reset}\n"
-info "monitor.conf: shipped with DP-1 @165Hz + HDMI-A-1 — edit the output names/modes there for your own monitors (check Mango output information inside your session)"
+info "monitor.conf: generated for detected hardware; customize ~/.config/mango/local/monitor.conf (preserved on updates)."
 info "The cursor theme name in config.conf (cursor_theme=) — see the warning above if that theme isn't installed"
 info "Pick a wallpaper with SUPER+F (waypaper) any time you want to change it — wallust will regenerate colors automatically from then on"
 # info "Spicetify: autostart.sh runs 'spicetify backup apply' every login, but that needs one manual first-time setup after logging into Spotify — run 'spicetify backup apply' yourself once, following spicetify's own setup guide, before it'll do anything on autostart"

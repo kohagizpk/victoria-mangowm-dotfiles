@@ -57,6 +57,8 @@ class DeploymentTests(unittest.TestCase):
         self.assertFalse((self.home / 'forbidden').exists())
         self.assertFalse((mango / 'tests').exists())
         self.assertFalse((mango / '.git').exists())
+        self.assertFalse((mango / 'scripts/__pycache__').exists())
+        self.assertTrue((self.home / '.local/share/icons/Animated-Mew-Cursor/index.theme').is_file())
         self.assertTrue((mango / 'config/terminal_configs/img_terminal/example.png').is_file())
         self.assertTrue((mango / 'scripts/waybar-cava.sh').stat().st_mode & 0o100)
 
