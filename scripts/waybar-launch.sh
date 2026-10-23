@@ -1,56 +1,48 @@
-#!/bin/bash
-
+#!/usr/bin/env bash
+# One supervisor per user. flock avoids stale PID reuse and concurrent launches.
+set -u
 CONFIG_SRC="$HOME/.config/mango/waybar/config.jsonc"
 STYLE_SRC="$HOME/.config/mango/waybar/style.css"
-CONFIG_RUN="/tmp/waybar-config-$USER.jsonc"
-LOG="$HOME/.cache/waybar.log"
-LOCK="/tmp/waybar-launch-$USER.pid"
-
-# Só um supervisor (este script) vivo por vez. Se já tinha um rodando
-# de uma chamada anterior (boot, ou o wallust-reload.sh disparando de
-# novo), mata ELE primeiro - senão o loop de retry antigo fica
-# competindo com essa chamada nova e sobe waybar em dobro/triplo.
-if [ -f "$LOCK" ]; then
-    old_pid="$(cat "$LOCK" 2>/dev/null)"
-    [ -n "$old_pid" ] && kill "$old_pid" 2>/dev/null
+CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}"
+STATE_DIR="${XDG_RUNTIME_DIR:-$CACHE_DIR}/victoria-waybar"
+umask 077
+mkdir -p "$CACHE_DIR" "$STATE_DIR" || exit 1
+LOG="$CACHE_DIR/waybar.log"
+exec 9>"$STATE_DIR/launcher.lock"
+if ! flock -n 9; then
+    # Waybar's SIGUSR2 reloads its configuration/style without another supervisor.
+    pkill -USR2 -u "$(id -u)" -x waybar 2>/dev/null || true
+    exit 0
 fi
-echo $$ > "$LOCK"
-pkill -x waybar 2>/dev/null
-
-cp "$CONFIG_SRC" "$CONFIG_RUN"
-
-has_battery=false
-for d in /sys/class/power_supply/BAT*; do
-    [ -d "$d" ] && has_battery=true && break
-done
-
-if $has_battery; then
-    # injeta "battery" logo depois de "temperature" no modules-right
-    sed -i 's/"temperature",/"temperature",\n        "battery",/' "$CONFIG_RUN"
-fi
-
-# Se o waybar morrer rápido no boot (corrida com monitor/tray/etc
-# ainda subindo), tenta de novo em vez de ficar fora pro resto da
-# sessão. Se ficar de pé mais de 5s, para de insistir - não é mais
-# boot-race, é outra coisa (e o log abaixo mostra o que foi). Código
-# >=128 = morto por sinal (SIGTERM/SIGKILL de um pkill em outro
-# lugar) - nesse caso NÃO retenta, foi morte de propósito.
-attempts=0
-max_attempts=5
-while [ $attempts -lt $max_attempts ]; do
-    start=$(date +%s)
-    waybar -c "$CONFIG_RUN" -s "$STYLE_SRC" >>"$LOG" 2>&1
-    code=$?
-    elapsed=$(( $(date +%s) - start ))
-    echo "$(date '+%F %T') -- waybar saiu (codigo $code) depois de ${elapsed}s, tentativa $((attempts+1))" >>"$LOG"
-
-    if [ "$code" -ge 128 ]; then
-        echo "$(date '+%F %T') -- morto por sinal, nao vou tentar de novo" >>"$LOG"
+CONFIG_RUN="$(mktemp "$STATE_DIR/config.XXXXXXXX.jsonc")" || exit 1
+child=""
+cleanup() {
+    if [[ -n "$child" ]]; then
+        kill "$child" 2>/dev/null || true
+        wait "$child" 2>/dev/null || true
+    fi
+    rm -f "$CONFIG_RUN"
+}
+trap cleanup EXIT
+trap 'exit 0' INT TERM
+cp "$CONFIG_SRC" "$CONFIG_RUN" || exit 1
+for battery in /sys/class/power_supply/BAT*; do
+    if [[ -d "$battery" ]]; then
+        sed -i 's/"temperature",/"temperature",\n        "battery",/' "$CONFIG_RUN"
         break
     fi
-    [ "$elapsed" -ge 5 ] && break
-    attempts=$((attempts+1))
-    sleep 1
 done
-
-rm -f "$LOCK"
+for ((attempt=1; attempt<=5; attempt++)); do
+    start=$SECONDS
+    # The child must not inherit the supervisor's lock.
+    waybar -c "$CONFIG_RUN" -s "$STYLE_SRC" 9>&- >>"$LOG" 2>&1 &
+    child=$!
+    wait "$child"
+    code=$?
+    child=""
+    elapsed=$((SECONDS - start))
+    printf '%s -- waybar exit=%s after %ss, attempt=%s\n' "$(date '+%F %T')" "$code" "$elapsed" "$attempt" >>"$LOG"
+    [[ "$code" -eq 0 || "$code" -ge 128 || "$elapsed" -ge 5 ]] && break
+    [[ "$attempt" -lt 5 ]] && sleep 1
+done
+exit "$code"

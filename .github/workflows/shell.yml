@@ -1,0 +1,20 @@
+name: Shell regression tests
+on:
+  push:
+    branches: [master]
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Fish for shell integration checks
+        run: sudo apt-get update -qq && sudo apt-get install -y fish
+      - name: Install Wallust 3.5.1 for real template rendering
+        run: cargo install wallust --version 3.5.1 --locked
+      - name: Isolated installer and launcher tests
+        run: python3 -m unittest discover -s tests -v
+      - name: Check whitespace
+        run: git diff --check

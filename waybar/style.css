@@ -1,343 +1,75 @@
-/* Paleta gerada pelo wallust a partir do wallpaper atual.
-   Define background, foreground e color0..color15.
-   Template fonte: ~/.config/mango/waybar/waybar-colors.css
-   Saída (este import): ~/.config/mango/waybar/colors.css */
+/* Victoria — floating groups, wallpaper accents and readable neutral text. */
 @import "colors.css";
-
-@define-color white      	#F2F2F2;
-@define-color black      	#000000;
-@define-color text       	#FFFFFF;
-@define-color lightgray  	#686868;
-@define-color darkgray   	#353535;
-
-@define-color transparent	rgba(1, 1, 1, 0.5);
-@define-color teal-trans	rgba(1, 117, 84, 0.5);
-@define-color cyan			rgba(53, 140, 169, 1);
-
-@define-color background-module     @transparent;
-/* accent = roxo principal (workspaces, janela, hover). Antes era #cba6f7 fixo */
-@define-color accent                @color5;
-@define-color border-color          @color5;
-/* renomeado de "color13" pra não colidir com o color13 que o wallust importa acima */
-@define-color rosetone               @color13;
-
-/* Accents agora vêm do wallpaper via wallust em vez de fixos no Catppuccin Latte */
-@define-color sapphire  @color4;
-@define-color mauve     @color5;
-@define-color rosewater @color13;
-@define-color sky       @color12;
-@define-color red       @color1;
-@define-color yellow    @color3;
-@define-color teal      @color6;
+@define-color surface alpha(@background, 0.94);
+@define-color accent mix(@color5, @foreground, 0.30);
+@define-color subtle mix(@background, @foreground, 0.48);
+@define-color outline alpha(@foreground, 0.13);
 
 * {
-    font-family: "JetBrainsMono Nerd Font";
-    font-weight: bold;
-	min-height: 0;  
-    /* set font-size to 100% if font scaling is set to 1.00 using nwg-look */
-    font-size: 97%;
-    font-feature-settings: '"zero", "ss01", "ss02", "ss03", "ss04", "ss05", "cv31"';
+    font-family: "JetBrainsMono Nerd Font", monospace;
+    font-size: 12px;
+    font-weight: 500;
+    min-height: 0;
+    border: none;
+    text-shadow: none;
+    box-shadow: none;
 }
-
-window#waybar {
-    background: transparent;
-    border-radius: 0px;
-    color: @accent;
+window#waybar { background: transparent; color: @foreground; }
+window#waybar.hidden { opacity: 0; }
+.modules-left, .modules-center, .modules-right {
+    background: @surface;
+    border: 1px solid @outline;
+    border-radius: 12px;
+    padding: 3px 6px;
 }
-
-window#waybar.hidden {
-    opacity: 0;
-}
-
 tooltip {
     background: @background;
-    border-radius: 12px;
-    border-width: 1px;
-    border-style: solid;
-    border-color: @border-color;
-    color: #ffffff;
-}
-
-/*-----module groups----*/
-.modules-left,
-.modules-center,
-.modules-right {
-    background-color: @background-module;
-    border-radius:15px;
-    border-bottom:2px solid @border-color;
-	padding-top: 2px;
-	padding-bottom: 0px;
-	padding-right: 4px;
-	padding-left: 4px;
-}
-
-#workspaces {
-    padding: 0px 1px;
-    border-radius: 15px;
-    font-weight: bold;
-    font-style: normal;
-    opacity:0.8;
-    color:#FFFFFF;
-}
-
-#taskbar button {
-    color: #6E6A86;
-    box-shadow: none;
-	text-shadow: none;
-    border-radius: 30px;
-    padding-left: 4px;
-    padding-right: 4px;
-    animation: gradient_f 20s ease-in infinite;
-    transition: all 0.5s cubic-bezier(.55,-0.68,.48,1.682);
-}
-
-#taskbar button.active {
-    color: #ffd700;
-    border-radius: 50%;
-    background-color: black;
-    border-radius: 15px 15px 15px 15px;
-    padding-left: 8px;
-    padding-right: 8px;
-    animation: gradient_f 20s ease-in infinite;
-    transition: all 0.3s cubic-bezier(.55,-0.68,.48,1.682);
-}
-
-#taskbar button:hover {
-    color: #ffd700;
+    color: @foreground;
+    border: 1px solid @accent;
     border-radius: 10px;
- 	padding-left: 2px;
-    padding-right: 2px;
-    animation: gradient_f 20s ease-in infinite;
-    transition: all 0.3s cubic-bezier(.55,-0.68,.48,1.682);
 }
-
-#backlight,
-#backlight-slider,
-#battery,
-#bluetooth,
-#clock,
-#cpu,
-#temperature,
-#idle_inhibitor,
-#keyboard-state,
-#memory,
-#mode,
-#mpris,
-#network,
-#power-profiles-daemon,
-#pulseaudio,
-#pulseaudio-slider,
-#taskbar,
-#temperature,
-#tray,
-#window,
-#wireplumber,
-#workspaces,
-#custom-backlight,
-#custom-browser,
-#custom-cava_mviz,
-#custom-cycle_wall,
-#custom-dot_update,
-#custom-file_manager,
-#custom-keybinds,
-#custom-keyboard,
-#custom-light_dark,
-#custom-lock,
-#custom-hint,
-#custom-hypridle,
-#custom-menu,
-#custom-playerctl,
-#custom-power_vertical,
-#custom-power,
-#custom-quit,
-#custom-reboot,
-#custom-settings,
-#custom-spotify,
-#custom-swaync,
-#custom-tty,
-#custom-updater,
-#custom-hyprpicker,
-#custom-weather,
-#custom-weather.clearNight,
-#custom-weather.cloudyFoggyDay,
-#custom-weather.cloudyFoggyNight,
-#custom-weather.default, 
-#custom-weather.rainyDay,
-#custom-weather.rainyNight,
-#custom-weather.severe,
-#custom-weather.showyIcyDay,
-#custom-weather.snowyIcyNight,
-#custom-weather.sunnyDay {
-    color: #e5d9f5;
-	padding-right: 6px;
-	padding-left: 6px;;
-}
-
-#temperature.critical {
-    background-color: #ff0000;
-}
-
-@keyframes blink {
-    to {
-        color: #000000;
-    }
-}
-
-#backlight-slider slider,
-#pulseaudio-slider slider {
-    min-width: 0px;
-    min-height: 0px;
-    opacity: 0;
-    background-image: none;
-    border: none;
-    box-shadow: none;
-}
-
-#backlight-slider trough,
-#pulseaudio-slider trough {
-    min-width: 80px;
-    min-height: 5px;
-    border-radius: 5px;
-    background-color: #22252a;
-}
-
-#backlight-slider highlight,
-#pulseaudio-slider highlight {
-    min-height: 10px;
-    border-radius: 5px;
-    background-color: #ba5663;
-}
-
-#pulseaudio-slider,
-#pulseaudio {
-	color: @rosetone;
-}
-
-#pulseaudio.muted {
-    color: red;
-}
-
-#memory {
-	color: @sapphire;
-}
-
-#cpu {
-	color: @mauve;
-}
-
-#temperature {
-	color: @mauve;
-}
-
-#battery {
-	color: @rosewater;
-}
-
-#disk {
-	color: @sky;
-}
-
-#temperature.critical {
-    background-color: @red;
-}
-
-#battery.critical:not(.charging) {
-	color: #f53c3c;
-	animation-name: blink;
-	animation-duration: 3.0s;
-	animation-timing-function: steps(12);
-	animation-iteration-count: infinite;
-	animation-direction: alternate;
-}
-
-#custom-hypridle,
-#custom-lock,
-#idle_inhibitor {
-    color: @teal;
-}
-
-/*-----Indicators----*/
-#custom-hypridle.notactive,
-#idle_inhibitor.activated {
-	color: #39FF14;
-}
-
-
-#clock#2 {
-    color: #efe8f7;
-}
-
-#clock {
-	color: @sapphire;
-    border-radius: 15px;
-    border:2px solid @border-color;
-}
-#custom-updates {
-    color: @yellow;
-}
-#swaync{
-    color: #ffd700;}
-
-    /* Tags - ext/workspaces (mangowm) */
+tooltip label { padding: 6px; }
+#workspaces { padding: 0 2px; }
 #workspaces button {
-    padding: 0 7px;
-    color: @accent;
+    padding: 0 6px;
+    min-width: 20px;
+    color: @foreground;
     background: transparent;
     border-radius: 8px;
-    font-size: 95%;
-    min-width: 22px;
-    border-bottom: 2px solid @accent;
-    transition: all 0.2s ease;
+    margin: 0 2px;
+    transition: background-color 160ms ease, color 160ms ease;
 }
-
+#workspaces button.empty:not(.active) { color: @subtle; }
 #workspaces button.active {
-    color: #ffffff;
-    background-color: @accent;
-    border-radius: 10px;
-    padding: 0 10px;
+    color: @background;
+    background: @accent;
     font-weight: bold;
-    border-bottom: none;
 }
-
-#workspaces button.empty:not(.active) {
-    color: #444459;
-    border-bottom: none;
-}
-
-#workspaces button.urgent {
-    color: #f38ba8;
-    background-color: rgba(243, 56, 56, 0.2);
-    border-radius: 8px;
-    border-bottom: none;
-    animation-name: blink;
-    animation-duration: 1s;
-    animation-iteration-count: infinite;
-    animation-direction: alternate;
-}
-
-#workspaces button:hover {
-    color: @accent;
-    background-color: alpha(@accent, 0.15);
+#workspaces button:hover { background: alpha(@accent, 0.22); color: @foreground; }
+#workspaces button.active:hover { background: @accent; color: @background; }
+#workspaces button.urgent { color: @foreground; background: @color1; }
+#cpu, #memory, #temperature, #network, #battery, #pulseaudio,
+#mpris, #clock, #tray, #custom-cava_mviz, #custom-power {
+    padding: 0 8px;
+    color: @foreground;
     border-radius: 8px;
 }
-
-#custom-sep {
-    color: #444459;
-    padding: 0 2px;
-    font-size: 90%;
+#cpu, #memory, #temperature { color: mix(@foreground, @color5, 0.20); }
+#pulseaudio { color: mix(@foreground, @color6, 0.25); }
+#clock { background: alpha(@accent, 0.12); font-weight: bold; padding: 0 10px; }
+#custom-power { color: @accent; margin-left: 2px; }
+#custom-power:hover, #network:hover, #pulseaudio:hover, #clock:hover {
+    background: alpha(@accent, 0.20);
 }
-#mpris.paused {
-    color: #6c7086;
+#custom-sep { color: @outline; padding: 0 1px; }
+#mpris.paused, #pulseaudio.muted { color: @subtle; }
+#battery.warning { color: mix(@color3, @foreground, 0.40); }
+#battery.critical:not(.charging), #temperature.critical {
+    background: alpha(@color1, 0.35);
+    color: @foreground;
+    border: 1px solid @color1;
 }
-#group-mpris-controls {
-    background-color: rgba(30, 30, 46, 0.6);
-    border-radius: 20px;
-    padding: 0 4px;
-    margin: 0 4px;
-}
-
-#custom-mpris-prev,
-#custom-mpris-next {
-    color: #cdd6f4;
-    padding: 0 6px;
-}
+#battery.charging { color: mix(@color2, @foreground, 0.40); }
+#custom-cava_mviz { color: @accent; }
+#tray > .passive { -gtk-icon-effect: dim; }
+#tray > .needs-attention { background: alpha(@color1, 0.25); }

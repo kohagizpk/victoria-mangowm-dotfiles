@@ -2,13 +2,16 @@
 # ~/.config/mango/autostart.sh — chamado pelo exec_once do config.conf
 
 # ---------- Ambiente ----------
-export QT_QPA_PLATFORMTHEME=gtk3
+export GTK_THEME=Materia-dark-compact
+export QT_STYLE_OVERRIDE=kvantum
 export XCURSOR_THEME=Samuel-Noticias-Cursor
 export XCURSOR_SIZE=24
 export XDG_CURRENT_DESKTOP=wlroots
 export XDG_SESSION_TYPE=wayland
 
 dbus-update-activation-environment \
+    GTK_THEME \
+    QT_STYLE_OVERRIDE \
     WAYLAND_DISPLAY \
     XDG_CURRENT_DESKTOP \
     XDG_SESSION_TYPE \
@@ -37,10 +40,7 @@ sleep 0.8
 [ -f "$HOME/.local/bin/fix-volume.sh" ] && bash "$HOME/.local/bin/fix-volume.sh"
 
 # ---------- Wallpaper (awww + waypaper; o wallust roda via post_command) ----------
-awww-daemon &
-sleep 0.5
-waypaper --restore &
-sleep 1
+bash "$HOME/.config/mango/scripts/wallpaper-start.sh" &
 
 # ---------- Barra, notificações e OSD ----------
 bash ~/.config/mango/scripts/waybar-launch.sh &
@@ -64,8 +64,15 @@ sway-audio-idle-inhibit >/dev/null 2>&1 &
 # ---------- DPI do XWayland ----------
 echo "Xft.dpi: 140" | xrdb -merge
 
-# ---------- Apps ----------
-discord --enable-features=UseOzonePlatform,WebRTCPipeWireCapturer --ozone-platform=wayland &
-spicetify restore backup apply &
-spotify &
-helium-browser &
+# ---------- Apps (chosen by install.sh) ----------
+if [ -r "$HOME/.config/mango/apps.conf" ]; then
+    . "$HOME/.config/mango/apps.conf"
+    [ "${START_DISCORD:-0}" = 1 ] && discord --ozone-platform=wayland &
+    [ "${START_SPOTIFY:-0}" = 1 ] && spotify &
+    if [ "${START_BROWSER:-0}" = 1 ]; then
+        case "${BROWSER_COMMAND:-}" in
+            helium-browser|firefox|brave) "$BROWSER_COMMAND" & ;;
+        esac
+    fi
+fi
+# Spicetify is intentionally applied manually after Spotify updates.

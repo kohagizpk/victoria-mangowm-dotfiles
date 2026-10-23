@@ -1,14 +1,10 @@
-# Instalar em ~/.config/wallust/wallust.toml
-# (o template do mango vai em ~/.config/wallust/templates/mango-colors.conf;
-#  o install.sh copia os dois automaticamente)
-
-palette = "kmeans"
+# Wallust 3.x: kmeans extracts colors; dark is the palette layout.
+backend = "kmeans"
+palette = "dark"
+check_contrast = true
 
 [templates]
-waybar = { template = '../../mango/waybar/waybar-colors.css', target = '~/.config/mango/waybar/colors.css' }
+waybar = { template = 'waybar-colors.css', target = '~/.config/mango/waybar/colors.css' }
 mango = { template = 'mango-colors.conf', target = '~/.config/mango/colors.conf' }
-
-[hooks]
-# O mango já recarrega sozinho quando o colors.conf muda (auto_reload_config=1);
-# este hook só garante o reload caso isso esteja desligado.
-mango_reload = "mmsg dispatch reload_config"
+terminal = { template = 'terminal-colors.json', target = '~/.cache/wallust/victoria-palette.json' }
+# Session refresh and terminal sequences are handled by scripts/theme.py.
