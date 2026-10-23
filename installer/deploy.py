@@ -64,9 +64,12 @@ def stage(target, config_only=False):
                 lines = (MANGO / 'config.conf').read_text().splitlines()
                 path.write_text('\n'.join(line for line in lines if re.match(r'^\s*(xkb_rules_\w+|repeat_rate|repeat_delay|numlock_on)\s*=', line)) + '\n')
     if config_only:
-        for name in ('apps.conf', 'bind.conf', 'env.conf'):
+        for name in ('apps.conf', 'bind.conf', 'env.conf', 'waybar/config.jsonc'):
             if (MANGO / name).is_file():
                 copy(MANGO / name, target / name)
+
+        bar = target / 'waybar/config.jsonc'
+        bar.write_text(bar.read_text().replace('WaybarCava.sh', 'waybar-cava.sh'))
 
 
 def install():

@@ -18,7 +18,7 @@ O modo copia apenas arquivos necessários à sessão, prepara o hook do Waypaper
 
 Esses arquivos são carregados por último e preservados nas atualizações. O modo de configurações migra teclado e monitor da instalação anterior quando ainda não existem overrides. A instalação completa aplica o teclado escolhido no menu; `custom.conf` continua tendo a palavra final.
 
-No modo de configurações, `apps.conf`, `bind.conf` e `env.conf` existentes também são preservados. Para adotar novos atalhos padrão, compare seu arquivo com `config/mango/bind.conf` no checkout. Kitty, Fastfetch e as ações do wlogout existentes são mantidos. Os estilos gerenciados de menus e Waybar são atualizados; guarde personalizações de estilo no checkout ou no backup antes de atualizar.
+No modo de configurações, `apps.conf`, `bind.conf` e `env.conf` existentes também são preservados. A configuração da Waybar mantém seus módulos, sensores e ações de energia; apenas o nome antigo do script Cava é migrado. Para adotar novos atalhos padrão, compare seu arquivo com `config/mango/bind.conf` no checkout. Kitty, Fastfetch e as ações do wlogout existentes são mantidos. Os estilos gerenciados de menus e Waybar são atualizados; guarde personalizações de estilo no checkout ou no backup antes de atualizar.
 
 Não edite arquivos de cores gerados: altere os templates em `config/wallust/templates/` e reinstale as configurações. A paleta é renderizada em uma área temporária e validada antes de substituir os resultados. Rofi, Fuzzel e wlogout usam as cores novas na próxima abertura; Fish as aplica no próximo prompt.
 

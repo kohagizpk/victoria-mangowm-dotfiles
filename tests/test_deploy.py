@@ -38,6 +38,8 @@ class DeploymentTests(unittest.TestCase):
         (mango / 'monitor.conf').write_text('monitorrule=DP-9,1920x1080@60,0.0,1\n')
         (mango / 'apps.conf').write_text('START_BROWSER=1\n')
         (mango / 'bind.conf').write_text('# personal bindings\n')
+        (mango / 'waybar').mkdir()
+        (mango / 'waybar/config.jsonc').write_text('{"power":"loginctl poweroff","script":"WaybarCava.sh"}')
         for _ in range(2):
             result = self.run_install('--config-only')
             self.assertEqual(result.returncode, 0, result.stderr)
@@ -45,6 +47,8 @@ class DeploymentTests(unittest.TestCase):
             self.assertIn('DP-9', (mango / 'local/monitor.conf').read_text())
             self.assertEqual((mango / 'apps.conf').read_text(), 'START_BROWSER=1\n')
             self.assertEqual((mango / 'bind.conf').read_text(), '# personal bindings\n')
+            self.assertIn('loginctl poweroff', (mango / 'waybar/config.jsonc').read_text())
+            self.assertIn('waybar-cava.sh', (mango / 'waybar/config.jsonc').read_text())
             (mango / 'local/custom.conf').write_text('gap_outer_horizontal=17\n')
         self.assertEqual((mango / 'local/custom.conf').read_text(), 'gap_outer_horizontal=17\n')
         backups = list(self.home.glob('victoria-backup.*'))
