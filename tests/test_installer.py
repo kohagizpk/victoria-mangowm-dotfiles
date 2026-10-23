@@ -6,7 +6,7 @@ import tempfile
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
-INSTALL = (ROOT / 'install.sh').read_text()
+INSTALL = '\n'.join((ROOT / 'installer' / name).read_text() for name in ('full.sh', 'packages.sh', 'desktop.sh'))
 
 
 def section(start, end):
@@ -77,7 +77,7 @@ class InstallerTests(unittest.TestCase):
         config = self.home / '.config/mango'
         config.mkdir(parents=True)
         for filename in ('env.conf', 'autostart.sh', 'bind.conf'):
-            (config / filename).write_text((ROOT / filename).read_text())
+            (config / filename).write_text((ROOT / 'config/mango' / filename).read_text())
         self.mock('gsettings', 'exit 0')
         self.mock('xdg-settings', 'exit 0')
         backup = self.home / 'backup'; backup.mkdir()
@@ -133,7 +133,7 @@ class InstallerTests(unittest.TestCase):
     def test_shell_syntax(self):
         for script in ROOT.rglob('*.sh'):
             subprocess.run(['bash', '-n', str(script)], check=True, capture_output=True)
-        subprocess.run(['sh', '-n', str(ROOT / 'autostart.sh')], check=True)
+        subprocess.run(['sh', '-n', str(ROOT / 'config/mango/autostart.sh')], check=True)
 
 
 if __name__ == '__main__':

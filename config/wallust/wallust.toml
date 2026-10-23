@@ -8,3 +8,6 @@ waybar = { template = 'waybar-colors.css', target = '~/.config/mango/waybar/colo
 mango = { template = 'mango-colors.conf', target = '~/.config/mango/colors.conf' }
 terminal = { template = 'terminal-colors.json', target = '~/.cache/wallust/victoria-palette.json' }
 # Session refresh and terminal sequences are handled by scripts/theme.py.
+rofi = { template = 'rofi-colors.rasi', target = '~/.config/mango/config/rofi/colors.rasi' }
+fuzzel = { template = 'fuzzel.ini', target = '~/.config/mango/config/fuzzel.ini' }
+wlogout = { template = 'waybar-colors.css', target = '~/.config/wlogout/colors.css' }
