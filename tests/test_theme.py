@@ -78,6 +78,9 @@ for template in config['templates'].values():
         self.assertIn('focus_color=0x', (self.mango / 'colors.conf').read_text())
         self.assertNotIn('{{', (self.mango / 'waybar/colors.css').read_text())
         self.assertTrue((self.home / '.config/fish/conf.d/victoria-wallust.fish').is_file())
+        self.assertIn('background=111827f2', (self.mango / 'config/fuzzel.ini').read_text())
+        self.assertIn('normal-background: #111827', (self.mango / 'config/rofi/colors.rasi').read_text())
+        self.assertIn('@define-color background #111827', (self.home / '.config/wlogout/colors.css').read_text())
 
     def test_existing_multimonitor_settings_and_custom_hook_are_preserved(self):
         dp = self.home / 'dp image.jpg'; dp.touch()
@@ -183,7 +186,7 @@ for template in config['templates'].values():
         gtk.gtk_css_provider_load_from_path.restype = ctypes.c_int
         error = ctypes.POINTER(Error)()
         provider = gtk.gtk_css_provider_new()
-        valid = gtk.gtk_css_provider_load_from_path(provider, str(ROOT / 'waybar/style.css').encode(), ctypes.byref(error))
+        valid = gtk.gtk_css_provider_load_from_path(provider, str(ROOT / 'config/waybar/style.css').encode(), ctypes.byref(error))
         self.assertTrue(valid, error.contents.message.decode() if error else '')
 
 

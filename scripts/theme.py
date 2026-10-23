@@ -191,6 +191,9 @@ def apply(image=None, install=False):
             'waybar': MANGO / 'waybar/colors.css',
             'mango': MANGO / 'colors.conf',
             'terminal': CACHE / 'victoria-palette.json',
+            'rofi': MANGO / 'config/rofi/colors.rasi',
+            'fuzzel': MANGO / 'config/fuzzel.ini',
+            'wlogout': CONFIG / 'wlogout/colors.css',
         }
         # Render into staging: an invalid/missing template must not replace the
         # working desktop palette or publish a new Fish generation.
@@ -223,7 +226,7 @@ def apply(image=None, install=False):
             # Mango watches colors.conf; only refresh an already-running Waybar.
             if shutil.which('pkill'):
                 subprocess.run(['pkill', '-USR2', '-u', str(os.getuid()), '-x', 'waybar'], check=False)
-        print(f'Wallust: Waybar, Mango and Fish colors generated from {selected.name}')
+        print(f'Wallust: Waybar, Mango, Fish, Rofi, Fuzzel and wlogout colors generated from {selected.name}')
 
 
 def main():

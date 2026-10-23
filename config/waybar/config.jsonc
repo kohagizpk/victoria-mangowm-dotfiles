@@ -164,7 +164,7 @@
         "tooltip-format": "{used} usados de {total}"
     },
     "custom/cava_mviz": {
-    "exec": "$HOME/.config/mango/scripts/WaybarCava.sh",
+    "exec": "$HOME/.config/mango/scripts/waybar-cava.sh",
     "format": "{}",
     "tooltip": false
     }
