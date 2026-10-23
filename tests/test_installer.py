@@ -48,6 +48,30 @@ class InstallerTests(unittest.TestCase):
         r = self.run_bash(f'bash "{ROOT}/install.sh" --unknown', check=False)
         self.assertEqual(r.returncode, 2)
 
+    def test_optional_audio_package_failure_does_not_abort(self):
+        block = section('# ---------- optional audio inhibitor ----------', '# ---------- seat management (elogind) ----------')
+        self.mock('aur-helper', 'printf "%s\\n" "$*" >> "$HOME/packages"; case "$*" in *sway-audio-idle-inhibit-git*) exit 1;; esac')
+        prefix = 'AUR_HELPER=aur-helper; PACKAGES=(mangowm-git waybar-git); run() { "$@"; }; command() { return 1; }; step() { :; }; info() { :; }; ok() { :; }; warn() { echo "$*"; }; log_adapt() { :; }; confirm() { return 0; };\n'
+        result = self.run_bash(prefix + block + '\necho FINISHED')
+        self.assertIn('FINISHED', result.stdout)
+        self.assertIn('continuing without', result.stdout)
+        calls = (self.home / 'packages').read_text().splitlines()
+        self.assertEqual(calls, ['-S --needed --noconfirm mangowm-git waybar-git', '-S --needed --noconfirm sway-audio-idle-inhibit-git'])
+        # Required-package failures must still stop the installation.
+        self.mock('aur-helper', 'exit 42')
+        result = self.run_bash(prefix + block + '\necho FINISHED', check=False)
+        self.assertEqual(result.returncode, 42)
+        self.assertNotIn('FINISHED', result.stdout)
+
+    def test_audio_inhibitor_already_present_or_install_succeeds(self):
+        block = section('# ---------- optional audio inhibitor ----------', 'step "Packages (')
+        self.mock('aur-helper', 'echo installed >> "$HOME/packages"')
+        prefix = 'AUR_HELPER=aur-helper; run() { "$@"; }; info() { :; }; ok() { :; }; warn() { echo unexpected; }; log_adapt() { :; };\n'
+        self.run_bash(prefix + 'command() { return 1; };\n' + block + '\ninstall_audio_inhibitor')
+        self.assertEqual((self.home / 'packages').read_text(), 'installed\n')
+        self.run_bash(prefix + 'command() { return 0; };\n' + block + '\ninstall_audio_inhibitor')
+        self.assertEqual((self.home / 'packages').read_text(), 'installed\n')
+
     def test_all_browser_and_app_choices(self):
         choices = section('# Application choices are stored separately from autostart commands.', '# Back up every user')
         functions = 'confirm() { local a; read -r a || return 1; [[ "$a" == y ]]; }; warn() { :; }; err() { :; };\n'

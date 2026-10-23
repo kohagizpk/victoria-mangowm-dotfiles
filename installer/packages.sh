@@ -155,7 +155,7 @@ PACKAGES=(
 
     # GTK theming (materia-dark, applied like nwg-look would)
     materia-gtk-theme kvantum kvantum-qt5 kvantum-theme-materia
-    xdg-utils xorg-xrdb sway-audio-idle-inhibit
+    xdg-utils xorg-xrdb
 
     # audio
     pipewire pipewire-pulse pipewire-alsa wireplumber
@@ -182,12 +182,27 @@ case "$INIT_SYSTEM" in
     systemd) PACKAGES+=(ly) ;;
 esac
 
+# ---------- optional audio inhibitor ----------
+# The AUR package has a -git suffix; the executable does not. Install this
+# convenience feature separately so its availability cannot block the desktop.
+install_audio_inhibitor() {
+    if command -v sway-audio-idle-inhibit >/dev/null 2>&1; then
+        info "Audio idle inhibitor already installed"
+    elif run "$AUR_HELPER" -S --needed --noconfirm sway-audio-idle-inhibit-git; then
+        ok "Optional audio idle inhibitor installed"
+    else
+        warn "Could not install optional sway-audio-idle-inhibit-git; continuing without audio-based idle inhibition."
+        log_adapt "Optional audio idle inhibitor skipped. Retry later: $AUR_HELPER -S --needed sway-audio-idle-inhibit-git"
+    fi
+}
+
 step "Packages (${#PACKAGES[@]})"
 info "${PACKAGES[*]}"
 info "Using --noconfirm so this doesn't sit waiting on an easy-to-miss prompt (e.g. picking between multiple providers for the same package)."
 if confirm "Install everything now? (builds -git AUR packages, can take a while)"; then
     run "$AUR_HELPER" -S --needed --noconfirm "${PACKAGES[@]}"
     ok "Packages installed"
+    install_audio_inhibitor
 else
     warn "Skipped. The rest of the script continues, but the environment won't fully work until these are installed manually."
 fi

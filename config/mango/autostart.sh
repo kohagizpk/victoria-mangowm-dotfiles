@@ -59,7 +59,9 @@ elif [ -x /usr/lib/xfce-polkit/xfce-polkit ]; then
     pgrep -f xfce-polkit >/dev/null || /usr/lib/xfce-polkit/xfce-polkit >/dev/null 2>&1 &
 fi
 # não suspende enquanto toca áudio
-sway-audio-idle-inhibit >/dev/null 2>&1 &
+if command -v sway-audio-idle-inhibit >/dev/null 2>&1; then
+    sway-audio-idle-inhibit >/dev/null 2>&1 &
+fi
 
 # ---------- DPI do XWayland ----------
 # Scale 1 is the portable default; customize DPI if needed.
