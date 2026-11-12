@@ -10,8 +10,7 @@ mkdir -p "$CACHE_DIR" "$STATE_DIR" || exit 1
 LOG="$CACHE_DIR/waybar.log"
 exec 9>"$STATE_DIR/launcher.lock"
 if ! flock -n 9; then
-    # Waybar's SIGUSR2 reloads its configuration/style without another supervisor.
-    pkill -USR2 -u "$(id -u)" -x waybar 2>/dev/null || true
+    # An existing supervisor already owns the bar; do not reload it.
     exit 0
 fi
 CONFIG_RUN="$(mktemp "$STATE_DIR/config.XXXXXXXX.jsonc")" || exit 1

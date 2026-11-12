@@ -44,6 +44,7 @@
     },
 
     "clock": {
+        "locale": "C",
         "format": "󰥔 {:%H:%M:%S}",
         "format-alt": "󰃭 {:%d/%m/%Y}",
         "interval": 1,
@@ -161,7 +162,7 @@
         "interval": 60,
         "path": "/",
         "format": "󰋊 {percentage_used}%",
-        "tooltip-format": "{used} usados de {total}"
+        "tooltip-format": "{used} used of {total}"
     },
     "custom/cava_mviz": {
     "exec": "$HOME/.config/mango/scripts/waybar-cava.sh",

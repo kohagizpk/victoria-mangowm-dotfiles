@@ -19,6 +19,7 @@ HOME = Path.home()
 CONFIG = HOME / '.config'
 MANGO = CONFIG / 'mango'
 CACHE = Path(os.environ.get('XDG_CACHE_HOME') or HOME / '.cache') / 'wallust'
+LAST_WALLPAPER = Path(os.environ.get('XDG_STATE_HOME') or HOME / '.local/state') / 'victoria/last-wallpaper'
 
 
 def atomic_write(path, text):
@@ -87,7 +88,7 @@ def active_wallpaper():
         image = line.split('currently displaying: image: ', 1)[1]
         path = expand_image(image)
         if path:
-            if line.split(':', 1)[0] == preferred:
+            if line.lstrip(': ').split(':', 1)[0] == preferred:
                 return path
             found.append(path)
     return found[0] if found else None
@@ -101,6 +102,11 @@ def setup():
     for template in (source / 'templates').iterdir():
         if template.is_file():
             shutil.copy2(template, target / 'templates' / template.name)
+    notifications = MANGO / 'config/swaync'
+    if notifications.is_dir():
+        for name in ('config.json', 'style.css'):
+            atomic_write(CONFIG / 'swaync' / name, (notifications / name).read_text())
+        subprocess.run([sys.executable, str(MANGO / 'scripts/notification-calendar.py'), 'prepare'], check=True)
     # TOML targets point at the actual cache location, including custom XDG paths.
     config = (source / 'wallust.toml').read_text()
     config = config.replace("'~/.cache/wallust/victoria-palette.json'", json.dumps(str(CACHE / 'victoria-palette.json')))
@@ -112,7 +118,7 @@ def setup():
     path = CONFIG / 'waypaper/config.ini'
     ini = read_ini(path)
     settings = ini['Settings']
-    hook = 'bash ' + shlex.quote(str(MANGO / 'scripts/wallust-reload.sh'))
+    hook = 'bash ' + shlex.quote(str(MANGO / 'scripts/wallust-reload.sh')) + ' $wallpaper'
     previous = settings.get('post_command', '').strip()
     # Preserve an unrelated user's hook, but do not duplicate our own on reruns.
     if previous and 'wallust-reload.sh' not in previous:
@@ -177,10 +183,11 @@ def apply(image=None, install=False):
     CACHE.mkdir(parents=True, exist_ok=True)
     with (CACHE / 'victoria.lock').open('w') as lock:
         fcntl.flock(lock, fcntl.LOCK_EX)
-        if install:
-            selected = expand_image(image) if image else saved_wallpaper()
+        last = expand_image(LAST_WALLPAPER.read_text()) if LAST_WALLPAPER.is_file() else None
+        if image:
+            selected = expand_image(image)
         else:
-            selected = active_wallpaper() or (expand_image(image) if image else None) or saved_wallpaper()
+            selected = last or (None if install else active_wallpaper()) or saved_wallpaper()
         if selected is None:
             raise RuntimeError('The selected wallpaper does not exist.')
         if not shutil.which('wallust'):
@@ -222,10 +229,18 @@ def apply(image=None, install=False):
             for name, destination in destinations.items():
                 atomic_write(destination, (staging / name).read_text())
         terminal_colors()
+        atomic_write(LAST_WALLPAPER, str(selected.resolve()) + '\n')
         if not install and os.environ.get('WAYLAND_DISPLAY'):
             # Mango watches colors.conf; only refresh an already-running Waybar.
             if shutil.which('pkill'):
                 subprocess.run(['pkill', '-USR2', '-u', str(os.getuid()), '-x', 'waybar'], check=False)
+        # SwayNC imports Waybar's palette; refresh it after each successful render.
+        if shutil.which('swaync-client') and os.environ.get('WAYLAND_DISPLAY'):
+            try:
+                subprocess.run(['swaync-client', '-sw', '-rs'], check=False,
+                               stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=3)
+            except (OSError, subprocess.TimeoutExpired):
+                pass
         print(f'Wallust: Waybar, Mango, Fish, Rofi, Fuzzel and wlogout colors generated from {selected.name}')
 
 

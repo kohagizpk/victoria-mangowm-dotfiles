@@ -17,7 +17,7 @@ HOME = Path.home()
 CONFIG = HOME / '.config'
 MANGO = CONFIG / 'mango'
 MAPPING = {
-    'config/mango': '.', 'config/waybar': 'waybar', 'scripts': 'scripts',
+    'config/mango': '.', 'config/swaync': 'config/swaync', 'config/waybar': 'waybar', 'scripts': 'scripts',
     'wallpapers': 'wallpaper', 'config/wallust': 'config/wallust',
     'config/fish': 'config/fish', 'config/rofi': 'config/rofi',
     'config/fuzzel/fuzzel.ini': 'config/fuzzel.ini', 'config/wlogout': 'config/wlogout',
@@ -113,7 +113,7 @@ def install():
         staged = Path(temporary)
         stage(staged, config_only=True)
         backup = Path(tempfile.mkdtemp(prefix='victoria-backup.', dir=HOME))
-        for name in ('mango', 'wallust', 'waypaper', 'fish', 'wlogout', 'kitty', 'fastfetch'):
+        for name in ('mango', 'wallust', 'waypaper', 'fish', 'wlogout', 'kitty', 'fastfetch', 'swaync'):
             source = CONFIG / name
             if source.exists():
                 shutil.copytree(source, backup / '.config' / name, symlinks=True)

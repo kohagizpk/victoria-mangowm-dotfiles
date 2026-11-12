@@ -2,6 +2,9 @@
 # ~/.config/mango/autostart.sh — chamado pelo exec_once do config.conf
 
 # ---------- Ambiente ----------
+export LANGUAGE=en
+export LC_MESSAGES=C.UTF-8
+export LC_TIME=C.UTF-8
 export GTK_THEME=Materia-dark-compact
 export QT_STYLE_OVERRIDE=kvantum
 export XCURSOR_THEME=Animated-Mew-Cursor
@@ -10,6 +13,7 @@ export XDG_CURRENT_DESKTOP=wlroots
 export XDG_SESSION_TYPE=wayland
 
 dbus-update-activation-environment \
+    LANGUAGE LC_MESSAGES LC_TIME \
     GTK_THEME \
     QT_STYLE_OVERRIDE \
     WAYLAND_DISPLAY \
@@ -40,7 +44,7 @@ sleep 0.8
 [ -f "$HOME/.local/bin/fix-volume.sh" ] && bash "$HOME/.local/bin/fix-volume.sh"
 
 # ---------- Wallpaper (awww + waypaper; o wallust roda via post_command) ----------
-bash "$HOME/.config/mango/scripts/wallpaper-start.sh" &
+bash "$HOME/.config/mango/scripts/wallpaper-start.sh"
 
 # ---------- Barra, notificações e OSD ----------
 bash ~/.config/mango/scripts/waybar-launch.sh &

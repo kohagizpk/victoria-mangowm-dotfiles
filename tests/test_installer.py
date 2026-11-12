@@ -118,7 +118,7 @@ class InstallerTests(unittest.TestCase):
         result = self.run_bash(functions + choices + '\nprintf "START:%s,%s,%s" "$START_DISCORD" "$START_SPOTIFY" "$START_BROWSER"', 'y\ny\n2\ny\ny\ny\n')
         self.assertIn('START:1,1,1', result.stdout)
 
-    def test_existing_waybar_lock_requests_reload_without_new_process(self):
+    def test_existing_waybar_lock_does_not_reload_or_start_new_process(self):
         import fcntl
         state = self.home / 'runtime/victoria-waybar'
         state.mkdir()
@@ -128,7 +128,7 @@ class InstallerTests(unittest.TestCase):
             fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
             self.run_bash(f'bash "{ROOT}/scripts/waybar-launch.sh"')
         self.assertFalse((self.home / 'new-waybar').exists())
-        self.assertIn('-USR2', (self.home / 'reload').read_text())
+        self.assertFalse((self.home / 'reload').exists())
 
     def test_shell_syntax(self):
         for script in ROOT.rglob('*.sh'):

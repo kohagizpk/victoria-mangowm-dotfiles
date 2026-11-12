@@ -37,7 +37,7 @@ from pathlib import Path
 args=sys.argv
 assert '--skip-sequences' in args and '--no-hooks' in args
 config=tomllib.loads(Path(args[args.index('--config-file')+1]).read_text())
-assert config['backend']=='kmeans' and config['palette']=='dark'
+assert config['backend']=='resized' and config['palette']=='kmeans' and config['style']=='dark'
 root=Path(args[args.index('--templates-dir')+1])
 colors={'background':'#111827','foreground':'#e5e7eb'}
 colors.update({f'color{i}':f'#{i+80:02x}8090' for i in range(16)})
@@ -98,13 +98,15 @@ for template in config['templates'].values():
         self.run_theme('apply', '--install')
         self.assertEqual((self.home / 'last-image').read_text(), str(hdmi))
 
-    def test_active_preferred_monitor_wins_over_callback_argument(self):
+    def test_selected_wallpaper_wins_and_persists_for_next_login(self):
         self.run_theme('setup')
         first = self.home / 'one.jpg'; first.touch()
         second = self.home / 'two.jpg'; second.touch()
         self.mock('awww', f'#!/bin/sh\nprintf "%s\\n" "DP-1: currently displaying: image: {first}" "HDMI-A-1: currently displaying: image: {second}"\n')
         self.run_theme('apply', str(first))
-        self.assertEqual((self.home / 'last-image').read_text(), str(second))
+        self.assertEqual((self.home / 'last-image').read_text(), str(first))
+        self.run_theme('apply', '--install')
+        self.assertEqual((self.home / 'last-image').read_text(), str(first))
 
     def test_single_monitor_and_offline_fallback(self):
         self.run_theme('setup')
@@ -114,7 +116,7 @@ for template in config['templates'].values():
         self.assertEqual((self.home / 'last-image').read_text(), str(image))
         self.mock('awww', '#!/bin/sh\nexit 1\n')
         self.run_theme('apply')
-        self.assertEqual((self.home / 'last-image').read_text(), str(self.mango / 'wallpaper/wallpaper.jpg'))
+        self.assertEqual((self.home / 'last-image').read_text(), str(image))
 
     def test_failed_or_incomplete_render_keeps_previous_palette(self):
         self.run_theme('setup'); self.run_theme('apply', '--install')

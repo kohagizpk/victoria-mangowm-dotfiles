@@ -300,7 +300,7 @@ if [[ -n "$BROWSER_COMMAND" ]] && confirm "Open the browser automatically at log
 # an in-place checkout. A failed copy stops installation before deployment.
 BACKUP_DIR="$(mktemp -d "$HOME/victoria-backup.XXXXXXXX")"
 for relative in .config/mango .config/wlogout .config/xdg-desktop-portal \
-    .config/wallust .config/waypaper .config/gtk-3.0 .config/gtk-4.0 \
+    .config/swaync .config/wallust .config/waypaper .config/gtk-3.0 .config/gtk-4.0 \
     .config/fastfetch .config/fish .config/kitty .config/Kvantum \
     .config/environment.d .config/mimeapps.list .local/share/applications/mimeapps.list \
     .local/share/icons .gtkrc-2.0 mango-nixos-snippet.nix; do

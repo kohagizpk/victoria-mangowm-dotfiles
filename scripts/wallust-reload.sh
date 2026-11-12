@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Waypaper post_command. Preference: HDMI-A-1, then another active output.
+# Waypaper passes the selected image; persist it for the next login.
 # --install IMAGE generates colors without contacting a running session.
 set -euo pipefail
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"

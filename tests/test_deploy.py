@@ -54,6 +54,11 @@ class DeploymentTests(unittest.TestCase):
         backups = list(self.home.glob('victoria-backup.*'))
         self.assertEqual(len(backups), 2)
         self.assertTrue(any((b / '.config/mango/config.conf').read_text().startswith('xkb_rules_layout=br') for b in backups))
+        import json
+        notifications = json.loads((self.home / '.config/swaync/config.json').read_text())
+        self.assertIn('MON TUE', notifications['widget-config']['label#calendar']['text'])
+        self.assertNotIn('/home/julia', json.dumps(notifications))
+        self.assertTrue((self.home / '.config/swaync/style.css').is_file())
         self.assertFalse((self.home / 'forbidden').exists())
         self.assertFalse((mango / 'tests').exists())
         self.assertFalse((mango / '.git').exists())

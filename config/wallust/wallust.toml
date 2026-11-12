@@ -1,6 +1,7 @@
-# Wallust 3.x: kmeans extracts colors; dark is the palette layout.
-backend = "kmeans"
-palette = "dark"
+# Wallust 4.x: resized backend, kmeans palette, dark style.
+backend = "resized"
+palette = "kmeans"
+style = "dark"
 check_contrast = true
 
 [templates]

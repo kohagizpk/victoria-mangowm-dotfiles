@@ -39,7 +39,16 @@ tooltip label { padding: 6px; }
     margin: 0 2px;
     transition: background-color 160ms ease, color 160ms ease;
 }
-#workspaces button.empty:not(.active) { color: @subtle; }
+#workspaces button.empty:not(.active) { color: alpha(#888888, 0.65); font-weight: normal; }
+/* Occupied tags: emphasize only the number. */
+#workspaces button:not(.empty):not(.active):not(.urgent) {
+    color: mix(@foreground, #ffffff, 0.75);
+    background: transparent;
+    font-weight: 900;
+    font-size: 14px;
+    box-shadow: none;
+}
+
 #workspaces button.active {
     color: @background;
     background: @accent;

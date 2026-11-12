@@ -1,0 +1,70 @@
+/* Victoria: same palette, typography and rounded surfaces as Waybar. */
+@import url("/etc/xdg/swaync/style.css");
+@import url("../mango/waybar/colors.css");
+:root {
+  --cc-bg: alpha(@background, 0.96);
+  --noti-border-color: alpha(@foreground, 0.13);
+  --noti-bg-hover: mix(@background, @color5, 0.18);
+  --noti-bg-focus: alpha(@color5, 0.20);
+  --noti-close-bg: alpha(@foreground, 0.08);
+  --noti-close-bg-hover: alpha(@color5, 0.4);
+  --text-color: @foreground;
+  --text-color-disabled: alpha(@foreground, 0.55);
+  --bg-selected: @color5;
+  --border-radius: 14px;
+  --notification-icon-size: 40px;
+  --font-size-body: 13px;
+  --font-size-summary: 14px;
+}
+* { font-family: "JetBrainsMono Nerd Font", sans-serif; text-shadow: none; }
+.control-center { border: 1px solid alpha(@foreground, 0.13); padding: 10px; }
+.notification-row .notification-background .notification {
+  background: alpha(@background, 0.96);
+  border: 1px solid alpha(@foreground, 0.15);
+  border-radius: 14px;
+}
+.notification-row .notification-background .notification.critical {
+  border-color: @color5;
+  border-left-width: 3px;
+}
+.notification-row .notification-background .notification .notification-default-action { padding: 12px; }
+.notification .summary { color: @foreground; }
+.notification .body { color: alpha(@foreground, 0.85); }
+.notification .time { color: alpha(@foreground, 0.5); font-size: 11px; }
+.widget-title { margin: 4px 8px; padding: 8px 4px; }
+.widget-title > label { font-size: 16px; font-weight: 700; color: mix(@color5, @foreground, 0.55); }
+.widget-title > button, .notification-action, .widget-buttons-grid flowboxchild > button {
+  background: alpha(@foreground, 0.06); color: @foreground;
+  border: 1px solid alpha(@foreground, 0.09); border-radius: 10px;
+  padding: 8px 12px; box-shadow: none;
+}
+.widget-title > button:hover, .notification-action:hover, .widget-buttons-grid flowboxchild > button:hover {
+  background: alpha(@color5, 0.25); border-color: alpha(@color5, 0.5);
+}
+.widget-label { background: alpha(@foreground, 0.035); border: 1px solid alpha(@foreground, 0.08); padding: 16px 10px; margin: 0 8px; }
+.widget-label > label { font-family: "JetBrainsMono Nerd Font", monospace; font-size: 14px; color: @foreground; }
+.widget-buttons-grid { margin: 4px 8px 12px; padding: 0; }
+.widget-buttons-grid flowboxchild > button { min-width: 88px; }
+.widget-dnd { background: alpha(@foreground, 0.035); padding: 10px 12px; }
+.widget-dnd label { font-size: 12px; }
+.widget-dnd switch { background: alpha(@foreground, 0.12); border: none; }
+.widget-dnd switch:checked { background: @color5; }
+.widget-dnd switch slider { background: @foreground; min-width: 16px; min-height: 16px; }
+.control-center-list-placeholder { color: alpha(@foreground, 0.55); }
+
+/* FlowBox selection is not a selected month or an active button. */
+.widget-buttons-grid flowboxchild,
+.widget-buttons-grid flowboxchild:selected,
+.widget-buttons-grid flowboxchild:focus {
+    background: transparent;
+    outline: none;
+    box-shadow: none;
+}
+.widget-buttons-grid flowboxchild > button:focus:not(:hover) {
+    background: alpha(@foreground, 0.06);
+    box-shadow: none;
+}
+.widget-buttons-grid flowboxchild > button:focus-visible {
+    outline: 1px solid alpha(@color5, 0.65);
+    outline-offset: -3px;
+}
