@@ -163,7 +163,7 @@ Control-center dependencies on Arch/Artix: `networkmanager bluez bluez-utils blu
 - The notification center includes an English calendar with Previous, Today and Next controls. Right-click the Waybar clock to open it. SwayNC 0.12-compatible widgets are used; this is a date viewer, not an event agenda.
 - Notifications use the wallpaper palette and rounded surfaces shared with Waybar. Installation backs up and replaces the managed SwayNC configuration and stylesheet.
 - Wallpaper restoration and palette generation finish before Waybar starts. Repeated launcher calls leave the existing bar alone. The last successfully selected wallpaper is saved under `$XDG_STATE_HOME/victoria/last-wallpaper` (default `~/.local/state`).
-- The bundled Wallust configuration targets Wallust 4.x (`resized` backend, `kmeans` palette, `dark` style).
+- The bundled Wallust configuration uses the 4.x format (`resized` backend, `kmeans` palette, `dark` style). The theme hook detects Wallust 3.x and adapts those options for rendering without rewriting your configuration.
 - Occupied tags use brighter, heavier numbers; empty tags are subdued. Rofi blurs the actual windows underneath (`blur_optimized=0`, with increased GPU cost), and Super-drag keeps tiled windows at their normal size.
 - Desktop messages and dates use English. Keyboard layout and timezone remain independently configurable.
 

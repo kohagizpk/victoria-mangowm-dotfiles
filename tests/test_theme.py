@@ -35,9 +35,15 @@ class ThemeTests(unittest.TestCase):
 import json, os, re, sys, tomllib
 from pathlib import Path
 args=sys.argv
+if '--version' in args:
+    print('wallust ' + os.environ.get('TEST_WALLUST_VERSION', '4.1.0-alpha'))
+    sys.exit(0)
 assert '--skip-sequences' in args and '--no-hooks' in args
 config=tomllib.loads(Path(args[args.index('--config-file')+1]).read_text())
-assert config['backend']=='resized' and config['palette']=='kmeans' and config['style']=='dark'
+if os.environ.get('TEST_WALLUST_VERSION', '').startswith('3.'):
+    assert config['backend']=='kmeans' and config['palette']=='dark' and 'style' not in config
+else:
+    assert config['backend']=='resized' and config['palette']=='kmeans' and config['style']=='dark'
 root=Path(args[args.index('--templates-dir')+1])
 colors={'background':'#111827','foreground':'#e5e7eb'}
 colors.update({f'color{i}':f'#{i+80:02x}8090' for i in range(16)})
@@ -58,7 +64,8 @@ for template in config['templates'].values():
     def run_theme(self, *args, success=True):
         r = subprocess.run(['python3', str(ROOT / 'scripts/theme.py'), *args], env=self.env, capture_output=True, text=True, timeout=45)
         if success:
-            self.assertEqual(r.returncode, 0, r.stderr)
+            log = self.cache / 'victoria.log'
+            self.assertEqual(r.returncode, 0, r.stderr + (log.read_text()[-8000:] if r.returncode and log.exists() else ''))
         else:
             self.assertNotEqual(r.returncode, 0)
         return r
@@ -170,6 +177,15 @@ for template in config['templates'].values():
         result = subprocess.run([fish, '--no-config', '-i', '-c', program], env=self.env, capture_output=True, text=True)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn('558090', result.stdout)
+
+    def test_wallust_v3_adapts_options_without_rewriting_source_config(self):
+        self.env['TEST_WALLUST_VERSION'] = '3.5.1'
+        self.run_theme('setup')
+        config = self.home / '.config/wallust/wallust.toml'
+        original = config.read_bytes()
+        self.run_theme('apply', '--install')
+        self.assertEqual(config.read_bytes(), original)
+        self.assertTrue((self.cache / 'victoria-generation').is_file())
 
     def test_actual_wallust_templates(self):
         binary = shutil.which('wallust')

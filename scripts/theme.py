@@ -23,6 +23,22 @@ CACHE = Path(os.environ.get('XDG_CACHE_HOME') or HOME / '.cache') / 'wallust'
 LAST_WALLPAPER = Path(os.environ.get('XDG_STATE_HOME') or HOME / '.local/state') / 'victoria/last-wallpaper'
 
 
+def wallust_render_config(config):
+    """Adapt the bundled v4 extraction options for stable Wallust v3."""
+    version = subprocess.run(['wallust', '--version'], capture_output=True, text=True,
+                             check=True, timeout=5).stdout
+    match = re.search(r'wallust\s+(\d+)\.', version)
+    if not match:
+        raise RuntimeError('Could not determine the installed Wallust version.')
+    config = dict(config)
+    if int(match[1]) == 3 and 'style' in config:
+        # v3 puts kmeans in backend and dark/light in palette; v4 splits them.
+        if config.get('palette') == 'kmeans':
+            config['backend'] = 'kmeans'
+        config['palette'] = config.pop('style')
+    return config
+
+
 def atomic_write(path, text):
     path.parent.mkdir(parents=True, exist_ok=True)
     fd, name = tempfile.mkstemp(prefix='.' + path.name, dir=path.parent)
@@ -212,6 +228,8 @@ def apply(image=None, install=False):
         # Render into staging: an invalid/missing template must not replace the
         # working desktop palette or publish a new Fish generation.
         config = tomllib.loads((CONFIG / 'wallust/wallust.toml').read_text())
+        if not fixed:
+            config = wallust_render_config(config)
         with tempfile.TemporaryDirectory(prefix='victoria-render-', dir=CACHE) as folder:
             staging = Path(folder)
             staged_config = ''.join(f'{key} = {json.dumps(value)}\n' for key, value in config.items() if not isinstance(value, dict))
