@@ -17,7 +17,7 @@ MANGO = HOME / '.config/mango'
 LOCAL = MANGO / 'local'
 STATE = Path(os.environ.get('XDG_STATE_HOME') or HOME / '.local/state') / 'victoria'
 DEFAULTS = dict(font_size=12, gaps=8, border=2, radius=12, opacity=0.96,
-                animations=True, blur=True, bar_position='top', color_mode='wallpaper', accent='#B9413E',
+                animations=True, blur=False, bar_position='top', color_mode='wallpaper', accent='#B9413E',
                 shadows=True, animation_speed='normal', cursor_size=36, focus_follows_mouse=True,
                 natural_scroll=False, tap_to_click=True, bar_margin=0,
                 show_stats=True, show_media=True, show_visualizer=True, show_tray=True,
@@ -26,7 +26,7 @@ DEFAULTS = dict(font_size=12, gaps=8, border=2, radius=12, opacity=0.96,
 PROFILES = {
     'Minimal': dict(font_size=12, gaps=4, border=1, radius=6, opacity=1.0, animations=False, blur=False),
     'Comfort': dict(font_size=14, gaps=10, border=2, radius=12, opacity=0.98, animations=True, blur=False),
-    'Effects': dict(font_size=12, gaps=8, border=2, radius=16, opacity=0.94, animations=True, blur=True),
+    'Effects': dict(font_size=12, gaps=8, border=2, radius=16, opacity=0.94, animations=True, blur=False),
 }
 BEGIN = '# BEGIN VICTORIA SETTINGS'
 END = '# END VICTORIA SETTINGS'
@@ -109,6 +109,8 @@ def validate_settings(data):
         raise ValueError('Invalid notification position.')
     if not isinstance(result['accent'], str) or not re.fullmatch(r'#[0-9a-fA-F]{6}', result['accent']):
         raise ValueError('Use a color such as #B9413E.')
+    # SceneFX #198: keep legacy saved settings from restoring unsafe blur.
+    result['blur'] = False
     return result
 
 

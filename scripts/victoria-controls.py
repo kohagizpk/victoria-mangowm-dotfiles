@@ -185,7 +185,10 @@ button.suggested-action { background-image: none; box-shadow: none; border: 1px 
             number(card,'opacity','Inactive window opacity',0.7,1,0.01)
             toggle(card,'animations','Window animations')
             select(card,'animation_speed','Animation speed',['fast','normal','relaxed'])
-            toggle(card,'blur','Background blur'); toggle(card,'shadows','Window shadows')
+            toggle(card,'blur','Background blur · unavailable for capture compatibility')
+            self.controls['blur'].set_sensitive(False)
+            self.controls['blur'].set_tooltip_text('Temporarily disabled: SceneFX issue #198 can terminate screen sharing with blur enabled.')
+            toggle(card,'shadows','Window shadows')
             wallpaper=Gtk.Button(label='Choose wallpaper…')
             wallpaper.connect('clicked',lambda *_: self.open_wallpaper()); card.append(wallpaper)
 

@@ -137,7 +137,7 @@ See [maintenance and personal overrides](docs/maintenance.md).
 Open **Victoria Settings** from the application launcher or press **Super + comma**.
 The GTK4 panel uses the desktop palette and includes:
 
-- **Personalize:** five collapsible groups (Appearance, Bar & clock, Notifications, Mouse & touchpad, Lock & idle), with an always-visible Apply button. Configure bar modules, edge spacing, 12/24-hour clock and seconds; notification corner, duration, width and images; cursor size, pointer focus, natural scrolling and tap-to-click. Critical notifications retain their own timeout. Includes live in-panel preview of interface font size, spacing, borders, corners and opacity; animation and blur switches; top/bottom Waybar; wallpaper colors or a fixed accent. Changes are applied explicitly.
+- **Personalize:** five collapsible groups (Appearance, Bar & clock, Notifications, Mouse & touchpad, Lock & idle), with an always-visible Apply button. Configure bar modules, edge spacing, 12/24-hour clock and seconds; notification corner, duration, width and images; cursor size, pointer focus, natural scrolling and tap-to-click. Critical notifications retain their own timeout. Includes live in-panel preview of interface font size, spacing, borders, corners and opacity; animation controls (blur temporarily disabled for screen-sharing compatibility); top/bottom Waybar; wallpaper colors or a fixed accent. Changes are applied explicitly.
 - **Profiles:** Minimal (compact, no effects), Comfort (larger text, restrained effects), and Effects (blur and animation).
 - **Setup:** four steps for keyboard, detected monitors and scale, application shortcuts, and a final review. Display changes revert after 20 seconds unless confirmed. Applications must already be installed. Console layout and timezone are not changed.
 - **Shortcuts:** search the actual bindings loaded through Mango's source files. Open directly with **Super + slash**.
@@ -164,7 +164,7 @@ Control-center dependencies on Arch/Artix: `networkmanager bluez bluez-utils blu
 - Notifications use the wallpaper palette and rounded surfaces shared with Waybar. Installation backs up and replaces the managed SwayNC configuration and stylesheet.
 - Wallpaper restoration and palette generation finish before Waybar starts. Repeated launcher calls leave the existing bar alone. The last successfully selected wallpaper is saved under `$XDG_STATE_HOME/victoria/last-wallpaper` (default `~/.local/state`).
 - The bundled Wallust configuration uses the 4.x format (`resized` backend, `kmeans` palette, `dark` style). The theme hook detects Wallust 3.x and adapts those options for rendering without rewriting your configuration.
-- Occupied tags use brighter, heavier numbers; empty tags are subdued. Rofi blurs the actual windows underneath (`blur_optimized=0`, with increased GPU cost), and Super-drag keeps tiled windows at their normal size.
+- Occupied tags use brighter, heavier numbers; empty tags are subdued. Background blur is temporarily disabled for screen-sharing compatibility. Super-drag keeps tiled windows at their normal size.
 - Desktop messages and dates use English. Keyboard layout and timezone remain independently configurable.
 
 ## Known issues and validation limits
@@ -290,3 +290,6 @@ and wallpaper-driven GTK/Qt themes. All are deployed by `install.sh`; no separat
 manual copying is required.
 
 See [Project layout](docs/project-layout.md) for the source/runtime directory mapping.
+
+Screen-sharing compatibility: blur is temporarily disabled, including existing saved
+profiles, to avoid SceneFX capture crashes. See [details](docs/desktop-controls.md#screen-sharing-compatibility).

@@ -77,3 +77,17 @@ Flatpak and applications with their own styles may require separate setup.
 Waybar starts once, after wallpaper/palette restoration, and detects the CPU temperature
 sensor by identity. Startup services run without fixed sleeps or unnecessary portal
 restarts. Put extra startup commands in `~/.config/mango/local/autostart.sh`.
+
+## Screen sharing compatibility
+
+Blur is temporarily disabled in the compositor defaults, all Settings profiles and
+the Settings switch. Installation also migrates existing blur overrides. Animations,
+shadows and the Hyprlock wallpaper blur remain available. This prevents older saved
+settings or the Effects profile from silently restoring the failing configuration.
+
+SceneFX issue [#198](https://github.com/wlrfx/scenefx/issues/198) documents invalid
+capture damage with blur and multiple outputs. The matching local failure was
+`Invalid buffer damage coordinates`, followed by the portal disconnecting. Disabling
+blur restored capture in the reported setup, including Settings on the DP output.
+This is a workaround, not a replacement for an upstream SceneFX fix. Re-enable the
+control only after verifying the fixed library and cross-output capture together.

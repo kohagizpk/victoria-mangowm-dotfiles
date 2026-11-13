@@ -24,6 +24,12 @@ class SettingsTests(unittest.TestCase):
         for key, value in [('HOME', self.home), ('MANGO', self.mango), ('LOCAL', self.local), ('STATE', self.state)]:
             p = patch.object(settings, key, value); p.start(); self.addCleanup(p.stop)
 
+    def test_saved_blur_is_disabled_for_screencast_compatibility(self):
+        (self.local / 'settings.json').write_text(json.dumps({'blur': True}))
+        (self.local / 'custom.conf').write_text('blur=1\nblur_layer=1\n')
+        self.assertFalse(settings.read_settings()['blur'])
+        self.assertFalse(settings.validate_settings(dict(settings.DEFAULTS, blur=True))['blur'])
+
     def test_profile_validation_and_invalid_color(self):
         for profile in settings.PROFILES.values():
             data = dict(settings.DEFAULTS, **profile)

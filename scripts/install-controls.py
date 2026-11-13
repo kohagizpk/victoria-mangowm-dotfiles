@@ -8,6 +8,10 @@ from victoria_settings import atomic, MANGO, HOME, read_settings, save_appearanc
 
 
 def install():
+    # Migrate preserved overrides too, including installations without settings.json.
+    custom = MANGO / 'local/custom.conf'
+    if custom.exists():
+        atomic(custom, re.sub(r'(?m)^(\s*blur(?:_layer)?\s*=\s*)[^#\n]+', r'\g<1>0', custom.read_text()))
     script = str(MANGO / 'scripts/victoria-controls.py')
     # Desktop Exec quoting is not shell quoting.
     quoted = '"' + script.replace('\\', '\\\\').replace('"', '\\"').replace('`', '\\`').replace('$', '\\$') + '"'
