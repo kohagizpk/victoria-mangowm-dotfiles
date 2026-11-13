@@ -147,6 +147,18 @@ for template in config['templates'].values():
         state_config.read(state)
         self.assertEqual(state_config['State']['backend'], 'awww')
 
+    def test_fixed_accent_survives_wallpaper_changes_without_wallust(self):
+        self.run_theme('setup')
+        local = self.mango / 'local'; local.mkdir()
+        (local / 'settings.json').write_text(json.dumps({'color_mode':'fixed', 'accent':'#AABBCC'}))
+        self.mock('wallust', '#!/bin/sh\necho unexpected > "$HOME/unexpected-wallust"; exit 99\n')
+        self.run_theme('apply', '--install')
+        self.assertIn('#AABBCC', (self.mango / 'waybar/colors.css').read_text())
+        image = self.home / 'new wallpaper.jpg'; image.touch()
+        self.run_theme('apply', str(image))
+        self.assertIn('#AABBCC', (self.mango / 'waybar/colors.css').read_text())
+        self.assertFalse((self.home / 'unexpected-wallust').exists())
+
     def test_actual_fish_loader_and_prompt_refresh(self):
         fish = shutil.which('fish')
         if not fish:

@@ -66,7 +66,7 @@ class InstallerTests(unittest.TestCase):
         (kitty / 'link').symlink_to('kitty.conf')
         block = section('# Back up every user', '# ---------- where are the dotfiles')
         # The marker splits a prose comment, so resume at the first statement.
-        block = block[block.index('BACKUP_DIR='):]
+        block = block[block.index('BACKUP_ROOT='):]
         result = self.run_bash('info() { :; };\n' + block + '\nprintf "%s" "$BACKUP_DIR"')
         backup = Path(result.stdout)
         self.assertEqual((backup / '.config/kitty/kitty.conf').read_text(), 'my settings')

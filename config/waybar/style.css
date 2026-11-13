@@ -82,3 +82,10 @@ tooltip label { padding: 6px; }
 #custom-cava_mviz { color: @accent; }
 #tray > .passive { -gtk-icon-effect: dim; }
 #tray > .needs-attention { background: alpha(@color1, 0.25); }
+
+#custom-victoria-settings { color: @accent; padding: 0 9px; border-radius: 8px; }
+#custom-victoria-settings:hover { background: alpha(@accent, 0.20); }
+#custom-temperature-unavailable { color: @subtle; padding: 0 8px; }
+
+#custom-control-center { color: @accent; padding: 0 9px; border-radius: 8px; }
+#custom-control-center:hover { background: alpha(@accent, 0.20); }

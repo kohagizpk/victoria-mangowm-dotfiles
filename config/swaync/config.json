@@ -38,6 +38,7 @@
     "buttons-grid#calendar",
     "title",
     "dnd",
+    "buttons-grid#performance",
     "notifications"
   ],
   "widget-config": {
@@ -76,6 +77,17 @@
     },
     "notifications": {
       "vexpand": true
+    },
+    "buttons-grid#performance": {
+      "buttons-per-row": 1,
+      "actions": [
+        {
+          "label": "Visual performance",
+          "type": "toggle",
+          "command": "python3 \"$HOME/.config/mango/scripts/session-controls.py\" performance-set",
+          "update-command": "python3 \"$HOME/.config/mango/scripts/session-controls.py\" performance-status"
+        }
+      ]
     }
   }
 }

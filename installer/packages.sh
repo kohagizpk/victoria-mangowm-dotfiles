@@ -118,14 +118,15 @@ PACKAGES=(
     kitty foot fish fastfetch
 
     # file manager & misc GUI utilities
-    nemo pavucontrol nwg-look
+    nemo pavucontrol nwg-look gtk4-layer-shell python-pillow
 
     # wallpaper (awww, formerly swww, is the actual backend waypaper/wallust
     # drive here — see scripts/wallust-reload.sh), multi-monitor
     awww waypaper
 
     # wallpaper-driven color scheme (wallust) + the two things it re-colors
-    wallust cava python
+    wallust cava python python-gobject gtk4
+    networkmanager bluez bluez-utils blueman libpulse power-profiles-daemon
 
     # Spotify theming (needs a one-time manual "spicetify backup apply"
     # after first login — see the summary at the end)
@@ -138,7 +139,7 @@ PACKAGES=(
     # actual running notification daemon is swaync
     dunst swaync libnotify
     swayosd brightnessctl pamixer
-    swaylock-effects swayidle
+    hyprlock swaylock-effects swayidle
     xfce-polkit
 
     # session / logout, blue light filter
@@ -177,8 +178,8 @@ PACKAGES=(
 # ly is the display manager on every init system; each one needs its own
 # integration package.
 case "$INIT_SYSTEM" in
-    openrc)  PACKAGES+=(elogind-openrc ly ly-openrc) ;;
-    dinit)   PACKAGES+=(elogind-dinit ly ly-dinit) ;;
+    openrc)  PACKAGES+=(elogind-openrc ly ly-openrc power-profiles-daemon-openrc) ;;
+    dinit)   PACKAGES+=(elogind-dinit ly ly-dinit power-profiles-daemon-dinit) ;;
     systemd) PACKAGES+=(ly) ;;
 esac
 
@@ -325,8 +326,9 @@ if [[ "$DISTRO_FAMILY" == "fedora" ]]; then
     FEDORA_PACKAGES=(
         mangowm
         waybar rofi fuzzel foot kitty fish fastfetch
-        nemo pavucontrol nwg-look
-        awww waypaper cava python3
+        nemo pavucontrol nwg-look gtk4-layer-shell python3-pillow
+        awww waypaper cava python3 python3-gobject gtk4
+        NetworkManager bluez blueman pulseaudio-utils power-profiles-daemon hyprlock swaylock swayidle
         grim slurp
         dunst swaync libnotify
         swayosd brightnessctl pamixer swayidle
@@ -481,12 +483,13 @@ if [[ "$DISTRO_FAMILY" == "nixos" ]]; then
 { pkgs, ... }: {
   environment.systemPackages = with pkgs; [
     waybar rofi fuzzel foot kitty fish fastfetch
-    nemo pavucontrol nwg-look
+    nemo pavucontrol nwg-look gtk4-layer-shell
     awww waypaper
-    wallust cava python3
+    wallust cava (python3.withPackages (ps: [ ps.pygobject3 ps.pillow ]))
+    gtk4 gobject-introspection networkmanager bluez blueman pulseaudio power-profiles-daemon
     grim slurp
     dunst swaync libnotify
-    swayosd brightnessctl pamixer swayidle swaylock-effects
+    swayosd brightnessctl pamixer swayidle hyprlock swaylock-effects
     xfce-polkit wlogout wlsunset
     xdg-desktop-portal xdg-desktop-portal-wlr xdg-desktop-portal-gtk
     xwayland

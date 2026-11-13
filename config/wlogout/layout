@@ -1,6 +1,6 @@
 	{
 	    "label" : "lock",
-	    "action" : "swaylock -f",
+	    "action" : "python3 ~/.config/mango/scripts/session-controls.py lock",
 	    "text" :"LOCK",
 	    "keybind" : "l"
 	}
@@ -12,7 +12,7 @@
 	}
 	{
 	    "label" : "suspend",
-	    "action" : "loginctl suspend",
+	    "action" : "python3 ~/.config/mango/scripts/session-controls.py suspend",
 	    "text" :"SUSPEND",
 	   	"keybind" : "s"
 	}

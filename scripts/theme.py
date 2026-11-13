@@ -11,6 +11,7 @@ import shlex
 import shutil
 import subprocess
 import sys
+sys.dont_write_bytecode = True
 import tempfile
 import time
 import tomllib
@@ -104,7 +105,7 @@ def setup():
             shutil.copy2(template, target / 'templates' / template.name)
     notifications = MANGO / 'config/swaync'
     if notifications.is_dir():
-        for name in ('config.json', 'style.css'):
+        for name in ('config.json', 'style.css', 'performance-label.svg', 'performance-on.svg', 'performance-off.svg'):
             atomic_write(CONFIG / 'swaync' / name, (notifications / name).read_text())
         subprocess.run([sys.executable, str(MANGO / 'scripts/notification-calendar.py'), 'prepare'], check=True)
     # TOML targets point at the actual cache location, including custom XDG paths.
@@ -147,6 +148,9 @@ def setup():
         stream = io.StringIO()
         state.write(stream)
         atomic_write(state_path, stream.getvalue())
+    controls = MANGO / 'scripts/install-controls.py'
+    if controls.is_file():
+        subprocess.run([sys.executable, str(controls)], check=True)
     return image
 
 
@@ -190,7 +194,10 @@ def apply(image=None, install=False):
             selected = last or (None if install else active_wallpaper()) or saved_wallpaper()
         if selected is None:
             raise RuntimeError('The selected wallpaper does not exist.')
-        if not shutil.which('wallust'):
+        settings_path = MANGO / 'local/settings.json'
+        settings = json.loads(settings_path.read_text()) if settings_path.exists() else {}
+        fixed = settings.get('color_mode') == 'fixed'
+        if not fixed and not shutil.which('wallust'):
             raise RuntimeError('wallust is missing; install it and run scripts/wallust-reload.sh again.')
         # Skip Wallust's global PTY writes: Fish applies cached OSC sequences itself.
         # Explicit paths avoid an unrelated XDG_CONFIG_HOME selecting another config.
@@ -217,7 +224,23 @@ def apply(image=None, install=False):
                        '--templates-dir', str(CONFIG / 'wallust/templates'), 'run', str(selected)]
             with (CACHE / 'victoria.log').open('a') as log:
                 log.write(f'\nWallpaper: {selected}\n'); log.flush()
-                subprocess.run(command, stdout=log, stderr=log, check=True)
+                if fixed:
+                    accent = settings.get('accent', '#B9413E')
+                    if not re.fullmatch(r'#[0-9a-fA-F]{6}', accent):
+                        raise ValueError('Invalid fixed accent color.')
+                    colors = dict(background='#141218', foreground='#EEEAF2')
+                    base = ['#201D25', '#E58181', '#A6C98D', '#E5C890', '#9EB6E8', accent, '#92C7C5', '#D6D1DD',
+                            '#726B7D', '#F29A9A', '#B7DB9C', '#F0D5A1', '#B3C7F2', accent, '#A8DBD8', '#EEEAF2']
+                    colors.update({f'color{i}': value for i, value in enumerate(base)})
+                    def render(match):
+                        name, _, transform = match[1].strip().partition('|')
+                        value = colors[name.strip()]
+                        return value.lstrip('#') if transform.strip() == 'strip' else value
+                    for name in destinations:
+                        template = CONFIG / 'wallust/templates' / config['templates'][name]['template']
+                        (staging / name).write_text(re.sub(r'{{(.*?)}}', render, template.read_text()))
+                else:
+                    subprocess.run(command, stdout=log, stderr=log, check=True)
             for name in destinations:
                 path = staging / name
                 if not path.is_file() or not path.stat().st_size or '{{' in path.read_text():
@@ -229,6 +252,8 @@ def apply(image=None, install=False):
             for name, destination in destinations.items():
                 atomic_write(destination, (staging / name).read_text())
         terminal_colors()
+        from theme_extras import apply as apply_extras
+        apply_extras(colors)
         atomic_write(LAST_WALLPAPER, str(selected.resolve()) + '\n')
         if not install and os.environ.get('WAYLAND_DISPLAY'):
             # Mango watches colors.conf; only refresh an already-running Waybar.

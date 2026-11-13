@@ -18,7 +18,7 @@ def main():
         print(f'{"OK" if ok else "MISSING"}: {label}' + ('' if ok else f' — {hint}'))
         failures += not ok
 
-    for command in ('mango', 'waybar', 'wallust', 'fish', 'awww', 'waypaper', 'kitty', 'rofi', 'fuzzel', 'wlogout'):
+    for command in ('mango', 'waybar', 'wallust', 'fish', 'awww', 'waypaper', 'kitty', 'rofi', 'fuzzel', 'wlogout', 'cliphist', 'wl-copy', 'wl-paste', 'hyprlock', 'swayidle', 'nmcli', 'pactl'):
         check(shutil.which(command), command, f'Install {command} with your distribution package manager.')
     for name in ('config.conf', 'colors.conf', 'local/custom.conf', 'waybar/config.jsonc', 'waybar/colors.css',
                  'config/rofi/colors.rasi', 'config/fuzzel.ini'):
@@ -30,7 +30,7 @@ def main():
         path = config / f'gtk-{version}.0/settings.ini'
         check(path.is_file() and 'Materia-dark-compact' in path.read_text(), f'GTK {version} dark theme', 'Run the full installer to configure Materia-dark-compact.')
     path = config / 'Kvantum/kvantum.kvconfig'
-    check(path.is_file() and 'MateriaDark' in path.read_text(), 'Qt/Kvantum dark theme', 'Run the full installer and restart Ark/qBittorrent.')
+    check(path.is_file() and any(name in path.read_text() for name in ('MateriaDark','VictoriaWallustDark')), 'Qt/Kvantum dark theme', 'Run the full installer and restart Ark/qBittorrent.')
     print('Diagnostic only: no files, services or packages were modified.')
     return 1 if failures else 0
 

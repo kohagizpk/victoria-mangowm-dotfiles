@@ -7,9 +7,9 @@ https://github.com/user-attachments/assets/cb902017-0d69-4222-970d-5467773197c4
 ## Features
 
 - **Window manager:** [mango](https://github.com/mangowm/mango) — a dwl-based Wayland compositor
-- **Status bar:** Waybar, with a CPU temperature sensor auto-detected on install, a live tags module read straight from mango's own IPC, MPRIS media controls, and a calendar popup
-- **App launcher:** rofi, plus fuzzel for the clipboard picker
-- **Clipboard manager:** cliphist
+- **Status bar:** Waybar, with a CPU temperature sensor auto-detected at startup, a live tags module read straight from mango's own IPC, MPRIS media controls, and a calendar popup
+- **App launcher:** rofi, with rofi/fuzzel for the Control center
+- **Clipboard manager:** cliphist with a searchable GTK history, thumbnails and scrolling
 - **Notifications & OSD:** swaync for notifications, swayosd for on-screen volume/brightness feedback
 - **Screenshots:** grim + slurp
 - **Logout menu:** wlogout, themed
@@ -33,7 +33,7 @@ https://github.com/user-attachments/assets/cb902017-0d69-4222-970d-5467773197c4
 - **Adds Arch's own repos when it makes sense:** on an Arch-based distro that doesn't already ship Arch's `[extra]` (e.g. Artix — CachyOS/EndeavourOS already have them, so this is a no-op there), offers to add them with a mirrorlist matched to your existing region
 - **`--dry-run`:** prints a read-only high-level plan and exits before privilege checks, network access, prompts or filesystem writes. It is not a command-by-command simulation.
 - **Doesn't nag for your password 20 times:** asks once up front and keeps the sudo session alive for the rest of the run
-- **Backups:** existing user configuration is copied to `~/victoria-backup.XXXXXXXX` before deployment, including an in-place Mango checkout. Relevant system files are backed up under `/var/backups/victoria-*`. Re-running can overwrite customizations; inspect and keep the backup.
+- **Backups:** existing user configuration is copied to `~/.local/state/victoria/backups/install-*` (or `$XDG_STATE_HOME/victoria/backups`) before deployment, including an in-place Mango checkout. Relevant system files are backed up under `/var/backups/victoria-*`. Re-running can overwrite customizations; inspect and keep the backup.
 - **Application choices:** Discord and Spotify each have a yes/no prompt. Choose Helium, Firefox, Brave or no browser. Automatic startup is separately optional; shortcuts are generated for selected apps. “None” leaves the system browser default alone and removes SUPER+W from the deployed bindings.
 - **Qt theming:** installs Kvantum for Qt 5 and Qt 6 plus MateriaDark, alongside Materia-dark-compact for GTK.
 
@@ -52,7 +52,7 @@ mango -c ~/.config/mango/config.conf -p
 | SUPER + D           | App launcher (rofi)                    |
 | SUPER + 1...9       | Change tag/workspace                   |
 | ALT + 1...9         | Move program to tag/workspace          |
-| SUPER + V           | Clipboard history (cliphist + fuzzel)  |
+| SUPER + V           | Clipboard history with image previews  |
 | SUPER + Shift + S   | Screenshot                             |
 | SUPER + Enter       | Terminal (kitty)                       |
 | SUPER + E           | File manager (nemo)                    |
@@ -131,6 +131,32 @@ It preserves existing app preferences, bindings, environment, Kitty/Fastfetch co
 Use the full interactive installer for GTK/Kvantum setup and package choices.
 Wallust refreshes Waybar, borders, Fish, Rofi, Fuzzel and wlogout; missing Wallust leaves fallback colors and an actionable warning.
 See [maintenance and personal overrides](docs/maintenance.md).
+
+## Victoria Settings
+
+Open **Victoria Settings** from the application launcher or press **Super + comma**.
+The GTK4 panel uses the desktop palette and includes:
+
+- **Personalize:** five collapsible groups (Appearance, Bar & clock, Notifications, Mouse & touchpad, Lock & idle), with an always-visible Apply button. Configure bar modules, edge spacing, 12/24-hour clock and seconds; notification corner, duration, width and images; cursor size, pointer focus, natural scrolling and tap-to-click. Critical notifications retain their own timeout. Includes live in-panel preview of interface font size, spacing, borders, corners and opacity; animation and blur switches; top/bottom Waybar; wallpaper colors or a fixed accent. Changes are applied explicitly.
+- **Profiles:** Minimal (compact, no effects), Comfort (larger text, restrained effects), and Effects (blur and animation).
+- **Setup:** four steps for keyboard, detected monitors and scale, application shortcuts, and a final review. Display changes revert after 20 seconds unless confirmed. Applications must already be installed. Console layout and timezone are not changed.
+- **Shortcuts:** search the actual bindings loaded through Mango's source files. Open directly with **Super + slash**.
+- **Focus mode:** **Super + Shift + F** enables Do Not Disturb and hides secondary Waybar modules. Leaving restores the previous DND setting and the original module configuration. A FOCUS button in the bar also leaves this mode.
+- **Diagnostics:** dependency, compositor, audio and wallpaper checks with explanations, plus explicit actions to refresh colors, restore wallpaper and reload notifications.
+
+The first-run setup opens at login until completed or disabled with **Open Settings automatically at login**. Settings live in `~/.config/mango/local/settings.json` and a marked block in `local/custom.conf`; personal content outside that block is preserved. Profiles affect desktop components rather than changing every application's own font settings. No updater or update rollback feature is included.
+
+GTK4 and Python GObject are required (`gtk4 python-gobject` on Arch/Artix; `gtk4 python3-gobject` on Fedora). The installer includes them on these distributions. NixOS remains experimental and requires a Python environment providing PyGObject and the GTK4 typelib.
+
+## Control center, lock and performance
+
+- **Super + C** or the Waybar sliders beside the power button opens the Rofi control center. Set `VICTORIA_MENU=fuzzel` to use Fuzzel instead. Wi-Fi uses a graphical password dialog; Bluetooth uses paired devices and Blueman for pairing. Audio switching updates the default device and existing streams. Energy profiles use power-profiles-daemon and only list profiles reported by the hardware.
+- **Super + L** locks with **Hyprlock**: blurred wallpaper, live palette, clock and an always-visible password field. Enter your existing login password and press Enter. A compositor lock confirmation is required before powering down screens or suspending. Swaylock is a fallback if Hyprlock is unavailable. Wlogout uses the same lock-first path.
+- **Settings → Personalize → Lock & idle** controls optional lock, screen-off and suspend timeouts. Automatic idle actions start disabled; `0` disables automatic suspension. The managed swayidle instance still locks before system sleep. It respects compositor idle inhibitors and never terminates another unmanaged swayidle instance.
+- **Super + Shift + P** toggles performance mode: Mango window/tag/layer animations, blur and shadows are disabled together. A final `local/performance.conf` overlay leaves personal settings intact and restores them when turned off. This is independent of the CPU energy profile.
+- The Waypaper hook publishes one wallpaper palette to Waybar, Rofi, Fuzzel, SwayNC, wlogout, Mango borders, Fish, **Kitty**, **GTK3/GTK4**, and QuickCSS in existing **Vencord/Vesktop** installations. User files receive a bounded Victoria block and original copies are kept in `~/.local/state/victoria/theme-originals`. Existing Kitty/GTK windows may need reopening; sandboxed applications and Discord clients without Vencord are not modified. QuickCSS must be enabled in Vencord.
+
+Control-center dependencies on Arch/Artix: `networkmanager bluez bluez-utils blueman libpulse power-profiles-daemon`. Enable the appropriate services for your init system (on Artix/dinit, `power-profiles-daemon-dinit` provides the power service). The center reports missing services without pretending that an action succeeded.
 
 ## Desktop updates
 
@@ -255,3 +281,12 @@ The automated tests cover setup, saved/active/missing monitors, XDG state, repea
 installation, custom hooks, failed rendering and native GTK CSS parsing. CI also
 runs the real Wallust renderer and Fish loader. Full compositor/DM installation
 and screenshot-level validation still require a real desktop session.
+
+## Desktop controls and feature guide
+
+See [Desktop controls](docs/desktop-controls.md) for the settings panel, Control center,
+Wi-Fi authentication, audio mixers, clipboard browser, lock/idle, visual performance,
+and wallpaper-driven GTK/Qt themes. All are deployed by `install.sh`; no separate
+manual copying is required.
+
+See [Project layout](docs/project-layout.md) for the source/runtime directory mapping.

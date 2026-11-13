@@ -17,7 +17,7 @@ HOME = Path.home()
 CONFIG = HOME / '.config'
 MANGO = CONFIG / 'mango'
 MAPPING = {
-    'config/mango': '.', 'config/swaync': 'config/swaync', 'config/waybar': 'waybar', 'scripts': 'scripts',
+    'config/mango': '.', 'config/hyprlock': 'config/hyprlock', 'config/swaync': 'config/swaync', 'config/waybar': 'waybar', 'scripts': 'scripts',
     'wallpapers': 'wallpaper', 'config/wallust': 'config/wallust',
     'config/fish': 'config/fish', 'config/rofi': 'config/rofi',
     'config/fuzzel/fuzzel.ini': 'config/fuzzel.ini', 'config/wlogout': 'config/wlogout',
@@ -76,12 +76,22 @@ def stage(target, config_only=False):
         (local / 'monitor.conf').write_text('# Personal monitor rules; preserved by the installer.\n')
     monitors.configure(target / 'monitor.conf')
     if config_only:
-        for name in ('apps.conf', 'bind.conf', 'env.conf', 'waybar/config.jsonc'):
+        for name in ('apps.conf', 'bind.conf', 'env.conf', 'rule.conf', 'waybar/config.jsonc'):
             if (MANGO / name).is_file():
                 copy(MANGO / name, target / name)
 
         bar = target / 'waybar/config.jsonc'
         bar.write_text(bar.read_text().replace('WaybarCava.sh', 'waybar-cava.sh'))
+    # Migrate the known legacy personal-startup block into the preserved local directory.
+    old_autostart = MANGO / 'autostart.sh'
+    personal = local / 'autostart.sh'
+    if old_autostart.exists() and not personal.exists():
+        marker = '# Preferências pessoais preservadas na atualização.'
+        text = old_autostart.read_text()
+        if marker in text:
+            tail = text.split(marker, 1)[1].split('# Show guided setup', 1)[0]
+            lines = [line for line in tail.splitlines() if 'session-controls.py' not in line and 'victoria-controls.py' not in line]
+            personal.write_text('#!/bin/sh\n# Personal startup commands, preserved on reinstall.\n'+'\n'.join(lines).strip()+'\n')
     configure_cursor(target)
 
 
@@ -112,8 +122,10 @@ def install():
     with tempfile.TemporaryDirectory(prefix='victoria-deploy-') as temporary:
         staged = Path(temporary)
         stage(staged, config_only=True)
-        backup = Path(tempfile.mkdtemp(prefix='victoria-backup.', dir=HOME))
-        for name in ('mango', 'wallust', 'waypaper', 'fish', 'wlogout', 'kitty', 'fastfetch', 'swaync'):
+        backup_root = Path(os.environ.get('XDG_STATE_HOME') or HOME / '.local/state') / 'victoria/backups'
+        backup_root.mkdir(parents=True, exist_ok=True)
+        backup = Path(tempfile.mkdtemp(prefix='install-', dir=backup_root))
+        for name in ('mango', 'wallust', 'waypaper', 'fish', 'wlogout', 'kitty', 'fastfetch', 'swaync', 'gtk-3.0', 'gtk-4.0', 'Kvantum', 'qt5ct', 'qt6ct'):
             source = CONFIG / name
             if source.exists():
                 shutil.copytree(source, backup / '.config' / name, symlinks=True)
@@ -123,6 +135,10 @@ def install():
         state = Path(os.environ.get('XDG_STATE_HOME') or HOME / '.local/state') / 'waypaper'
         if state.exists():
             shutil.copytree(state, backup / 'waypaper-state', symlinks=True)
+        for name in ('victoria.desktop', 'victoria-shortcuts.desktop'):
+            source = HOME / '.local/share/applications' / name
+            if source.exists():
+                copy(source, backup / '.local/share/applications' / name)
         print(f'Backup: {backup}', flush=True)
         copy(staged, MANGO)
         copy(ROOT / 'themes/Animated-Mew-Cursor', icons)
@@ -134,6 +150,7 @@ def install():
         ):
             if not (CONFIG / destination).exists():
                 copy(ROOT / source, CONFIG / destination)
+        copy(ROOT / 'config/wlogout/icons', CONFIG / 'wlogout/icons')
         for name in ('style.css', 'colors.css'):
             copy(ROOT / 'config/wlogout' / name, CONFIG / 'wlogout' / name)
         subprocess.run([sys.executable, str(MANGO / 'scripts/theme.py'), 'setup'], check=True)

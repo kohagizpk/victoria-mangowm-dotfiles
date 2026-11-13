@@ -22,38 +22,33 @@ dbus-update-activation-environment \
     XCURSOR_THEME \
     XCURSOR_SIZE
 
-sleep 0.5
 
 # ---------- Áudio ----------
 pgrep -x pipewire >/dev/null || pipewire &
 pgrep -x wireplumber >/dev/null || wireplumber &
 pgrep -x pipewire-pulse >/dev/null || pipewire-pulse &
-sleep 0.5
 
-# ---------- Portais (screenshare, file picker...) ----------
-pkill -x xdg-desktop-portal-wlr 2>/dev/null
-pkill -x xdg-desktop-portal 2>/dev/null
-sleep 0.3
-
-/usr/lib/xdg-desktop-portal-wlr >/dev/null 2>&1 &
-sleep 0.8
-/usr/lib/xdg-desktop-portal --replace >/dev/null 2>&1 &
-sleep 0.8
+# ---------- Desktop portals ----------
+# D-Bus activates portals on demand with the environment imported above.
+# Do not kill/restart them or block login with fixed sleeps.
 
 # ---------- Script pessoal (opcional) ----------
-[ -f "$HOME/.local/bin/fix-volume.sh" ] && bash "$HOME/.local/bin/fix-volume.sh"
+[ -f "$HOME/.local/bin/fix-volume.sh" ] && bash "$HOME/.local/bin/fix-volume.sh" &
 
 # ---------- Wallpaper (awww + waypaper; o wallust roda via post_command) ----------
-bash "$HOME/.config/mango/scripts/wallpaper-start.sh"
+(
+    bash "$HOME/.config/mango/scripts/wallpaper-start.sh"
+    bash "$HOME/.config/mango/scripts/waybar-launch.sh"
+) &
 
 # ---------- Barra, notificações e OSD ----------
-bash ~/.config/mango/scripts/waybar-launch.sh &
 swaync &
 swayosd-server &
 
 # ---------- Clipboard ----------
 wl-clip-persist --clipboard regular --reconnect-tries 0 >/dev/null 2>&1 &
-wl-paste --watch cliphist store >/dev/null 2>&1 &
+wl-paste --type text --watch cliphist store >/dev/null 2>&1 &
+wl-paste --type image --watch cliphist store >/dev/null 2>&1 &
 
 # ---------- Serviços auxiliares ----------
 # autenticação gráfica (pkexec etc.)
@@ -81,3 +76,6 @@ if [ -r "$HOME/.config/mango/apps.conf" ]; then
     fi
 fi
 # Spicetify is intentionally applied manually after Spotify updates.
+
+# Personal startup commands stay outside managed files.
+[ ! -r "$HOME/.config/mango/local/autostart.sh" ] || sh "$HOME/.config/mango/local/autostart.sh" &

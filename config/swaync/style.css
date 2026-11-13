@@ -68,3 +68,35 @@
     outline: 1px solid alpha(@color5, 0.65);
     outline-offset: -3px;
 }
+
+/* Stateful performance button next to the DND controls. */
+.widget-buttons-grid flowboxchild > button.active,
+.widget-buttons-grid flowboxchild > button.active:focus:not(:hover) {
+    background: alpha(@color5, 0.32);
+    border-color: @color5;
+    color: @foreground;
+    font-weight: 700;
+}
+
+/* Match the DND geometry; the underlying button remains an accessible toggle. */
+.widget-dnd + .widget-buttons-grid { margin: 6px 4px; padding: 0; }
+.widget-dnd + .widget-buttons-grid flowboxchild { padding: 0; }
+.widget-dnd + .widget-buttons-grid flowboxchild > button,
+.widget-dnd + .widget-buttons-grid flowboxchild > button:focus:not(:hover) {
+    background-color: alpha(@foreground, 0.035);
+    background-image: url("performance-label.svg"), url("performance-off.svg");
+    background-repeat: no-repeat;
+    background-origin: content-box;
+    background-position: left center, right center;
+    background-size: 160px 18px, 28px 18px;
+    border: none; border-radius: 14px; min-height: 18px;
+    padding: 10px 12px; font-size: 12px; font-weight: normal;
+}
+.widget-dnd + .widget-buttons-grid flowboxchild > button > label { opacity: 0; }
+.widget-dnd + .widget-buttons-grid flowboxchild > button:checked,
+.widget-dnd + .widget-buttons-grid flowboxchild > button:checked:focus:not(:hover),
+.widget-dnd + .widget-buttons-grid flowboxchild > button.active,
+.widget-dnd + .widget-buttons-grid flowboxchild > button.active:focus:not(:hover) {
+    background-image: url("performance-label.svg"), url("performance-on.svg");
+    background-color: alpha(@foreground, 0.035);
+}

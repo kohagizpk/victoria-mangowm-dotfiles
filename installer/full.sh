@@ -298,11 +298,14 @@ if [[ -n "$BROWSER_COMMAND" ]] && confirm "Open the browser automatically at log
 
 # Back up every user configuration tree this installer can modify, including
 # an in-place checkout. A failed copy stops installation before deployment.
-BACKUP_DIR="$(mktemp -d "$HOME/victoria-backup.XXXXXXXX")"
+BACKUP_ROOT="${XDG_STATE_HOME:-$HOME/.local/state}/victoria/backups"
+mkdir -p "$BACKUP_ROOT"
+BACKUP_DIR="$(mktemp -d "$BACKUP_ROOT/install-XXXXXXXX")"
 for relative in .config/mango .config/wlogout .config/xdg-desktop-portal \
     .config/swaync .config/wallust .config/waypaper .config/gtk-3.0 .config/gtk-4.0 \
-    .config/fastfetch .config/fish .config/kitty .config/Kvantum \
+    .config/fastfetch .config/fish .config/kitty .config/Kvantum .config/qt5ct .config/qt6ct \
     .config/environment.d .config/mimeapps.list .local/share/applications/mimeapps.list \
+    .local/share/applications/victoria.desktop .local/share/applications/victoria-shortcuts.desktop \
     .local/share/icons .gtkrc-2.0 mango-nixos-snippet.nix; do
     if [[ -e "$HOME/$relative" || -L "$HOME/$relative" ]]; then
         mkdir -p "$BACKUP_DIR/$(dirname "$relative")"

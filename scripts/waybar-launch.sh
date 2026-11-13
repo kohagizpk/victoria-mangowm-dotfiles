@@ -24,13 +24,7 @@ cleanup() {
 }
 trap cleanup EXIT
 trap 'exit 0' INT TERM
-cp "$CONFIG_SRC" "$CONFIG_RUN" || exit 1
-for battery in /sys/class/power_supply/BAT*; do
-    if [[ -d "$battery" ]]; then
-        sed -i 's/"temperature",/"temperature",\n        "battery",/' "$CONFIG_RUN"
-        break
-    fi
-done
+python3 "$(dirname -- "${BASH_SOURCE[0]}")/bar_config.py" "$CONFIG_RUN" || exit 1
 for ((attempt=1; attempt<=5; attempt++)); do
     start=$SECONDS
     # The child must not inherit the supervisor's lock.

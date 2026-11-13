@@ -4,7 +4,7 @@ Mantenha o checkout fora de `~/.config/mango`. Se você clonou diretamente nessa
 
 ## Atualizar apenas os dotfiles
 
-Execute `./install.sh --config-only --dry-run` para ver o plano e `./install.sh --config-only` para aplicar. Cada execução cria um diretório `~/victoria-backup.*` antes de alterar as configurações. O caminho é exibido no terminal. O estado do Waypaper em XDG_STATE_HOME também recebe backup.
+Execute `./install.sh --config-only --dry-run` para ver o plano e `./install.sh --config-only` para aplicar. Cada execução cria um diretório `~/.local/state/victoria/backups/install-*` (ou `$XDG_STATE_HOME/victoria/backups`) antes de alterar as configurações. O caminho é exibido no terminal. O estado do Waypaper em XDG_STATE_HOME também recebe backup.
 
 O modo copia apenas arquivos necessários à sessão, prepara o hook do Waypaper e gera a paleta se o Wallust estiver instalado. Não usa sudo, não instala pacotes e não altera serviços ou o gerenciador de login. Se a geração falhar, o comando retorna erro; consulte o log do Wallust e o backup exibido. Para configurar Materia/Kvantum e dependências, use a instalação completa.
 

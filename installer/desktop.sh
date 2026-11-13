@@ -42,7 +42,7 @@ fi
 
 if [[ -d "$CONFIG_DIR/config/wlogout" ]]; then
     mkdir -p "$HOME/.config/wlogout"
-    cp "$CONFIG_DIR/config/wlogout/"* "$HOME/.config/wlogout/" 2>/dev/null || true
+    cp -a "$CONFIG_DIR/config/wlogout/." "$HOME/.config/wlogout/"
     if [[ "$INIT_SYSTEM" == systemd ]]; then
         sed -i -E 's/loginctl (poweroff|reboot|suspend|hibernate)/systemctl \1/g' "$HOME/.config/wlogout/layout"
         sed -i -E 's/loginctl (poweroff|reboot|suspend|hibernate)/systemctl \1/g' "$WAYBAR_JSONC"
@@ -93,26 +93,8 @@ log_adapt "Added ~/.config/xdg-desktop-portal/portals.conf pinning ScreenCast/Sc
 ok "Corrections applied"
 
 
-# ---------- CPU temperature sensor (waybar) ----------
-step "Detecting the CPU sensor for waybar"
-hwmon_path=""
-for d in /sys/class/hwmon/hwmon*; do
-    [ -r "$d/name" ] || continue
-    name="$(cat "$d/name" 2>/dev/null || true)"
-    case "$name" in
-        k10temp|coretemp|zenpower|cpu_thermal|acpitz)
-            hwmon_path="$d/temp1_input"
-            break
-            ;;
-    esac
-done
-if [[ -n "$hwmon_path" && -f "$WAYBAR_JSONC" ]]; then
-    run_sed -i "s#/sys/class/hwmon/hwmon[0-9]*/temp1_input#${hwmon_path}#" "$WAYBAR_JSONC"
-    ok "Sensor: $hwmon_path"
-    log_adapt "waybar/config.jsonc: hwmon-path was hardcoded (hwmon4) -> auto-detected as $hwmon_path"
-else
-    warn "Couldn't auto-detect the sensor. Set 'hwmon-path' in $WAYBAR_JSONC by hand (run 'sensors' or check /sys/class/hwmon/*/name)."
-fi
+# CPU sensors are selected by name at each Waybar launch, not by hwmon number.
+info "Waybar will detect a readable CPU temperature sensor at session startup."
 
 # ---------- wallust: Waybar, Mango borders and Fish ----------
 step "Wallpaper colors (Wallust)"
@@ -122,15 +104,7 @@ if ! command -v python3 >/dev/null 2>&1; then
 fi
 # Existing user configuration was backed up before deployment.
 WALLPAPER_FALLBACK="$(python3 "$CONFIG_DIR/scripts/theme.py" setup)"
-if command -v wallust >/dev/null 2>&1; then
-    if ! bash "$CONFIG_DIR/scripts/wallust-reload.sh" --install "$WALLPAPER_FALLBACK"; then
-        err "Initial palette generation failed. See ${XDG_CACHE_HOME:-$HOME/.cache}/wallust/victoria.log."
-        exit 1
-    fi
-    ok "Wallpaper palette generated for Waybar, Mango borders and Fish"
-else
-    warn "Wallust is not installed yet. Configurations are ready; generate the palette after installing it."
-fi
+
 log_adapt "Installed Wallust templates, Waypaper's awww hook and Fish palette loader; first palette uses the saved wallpaper or a bundled image."
 
 # ---------- monitors: generated native Mango rules ----------
@@ -396,6 +370,18 @@ if [[ -n "$FISH_BIN" && "$SHELL" != "$FISH_BIN" ]]; then
     fi
 else
     info "Already fish, or fish isn't installed"
+fi
+
+# Apply saved settings and the palette after base GTK/Kvantum defaults.
+python3 "$CONFIG_DIR/scripts/install-controls.py"
+if command -v wallust >/dev/null 2>&1; then
+    if ! bash "$CONFIG_DIR/scripts/wallust-reload.sh" --install "$WALLPAPER_FALLBACK"; then
+        err "Initial palette generation failed. See ${XDG_CACHE_HOME:-$HOME/.cache}/wallust/victoria.log."
+        exit 1
+    fi
+    ok "Wallpaper palette generated for Waybar, Mango borders and Fish"
+else
+    warn "Wallust is not installed yet. Configurations are ready; generate the palette after installing it."
 fi
 
 # ---------- health check ----------

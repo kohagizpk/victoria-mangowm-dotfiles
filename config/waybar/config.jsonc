@@ -64,7 +64,6 @@
     },
 
     "temperature": {
-        "hwmon-path": "/sys/class/hwmon/hwmon4/temp1_input",
         "interval": 5,
         "critical-threshold": 80,
         "format": "{icon} {temperatureC}°C",
@@ -100,7 +99,7 @@
         "on-click": "wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle",
         "on-scroll-up": "wpctl set-volume -l 1.0 @DEFAULT_AUDIO_SINK@ 2%+",
         "on-scroll-down": "wpctl set-volume -l 1.0 @DEFAULT_AUDIO_SINK@ 2%-",
-        "on-click-right": "pavucontrol",
+        "on-click-right": "python3 \"$HOME/.config/mango/scripts/audio-mixer.py\" output",
         "format-icons": {
             "headphone": "󰋋",
             "headset": "󰋎",
@@ -113,6 +112,7 @@
         "format-source": "󰍬 On",
         "format-source-muted": "󰍭 Off",
         "on-click": "wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle",
+        "on-click-right": "python3 \"$HOME/.config/mango/scripts/audio-mixer.py\" mic",
         "tooltip": false
     },
 

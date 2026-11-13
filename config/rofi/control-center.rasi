@@ -1,0 +1,12 @@
+@import "colors.rasi"
+configuration { show-icons: false; }
+* { font: "JetBrainsMono Nerd Font 12"; text-color: @foreground; background-color: transparent; }
+window { width: 560px; location: center; anchor: center; border: 1px; border-color: @color5; border-radius: 16px; background-color: @background; }
+mainbox { padding: 18px; spacing: 14px; children: [inputbar, listview]; }
+inputbar { spacing: 10px; children: [prompt, entry]; }
+prompt { text-color: @color5; }
+entry { placeholder: "Choose an action…"; }
+listview { lines: 11; fixed-height: false; spacing: 4px; }
+element { padding: 10px; border-radius: 8px; }
+element selected { background-color: @color5; text-color: @background; }
+element-text { text-color: inherit; }
