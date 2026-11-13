@@ -1,295 +1,303 @@
 # Victoria's MangoWM Dotfiles
 
-Personal dotfiles for a [mango](https://github.com/mangowm/mango) (dwl-based Wayland compositor) desktop — Waybar, a full Wayland utility stack, GRUB theming, and an installer that adapts itself to your distro, your init system, and your hardware.
+A wallpaper-colored Wayland desktop built around [Mango](https://github.com/mangowm/mango), with a floating settings app, a control center, notifications, audio mixers and a guided installer.
+
+Use the desktop controls for everyday changes. Keep your personal overrides separate from the files managed by the installer.
 
 https://github.com/user-attachments/assets/cb902017-0d69-4222-970d-5467773197c4
 
-## Features
+> **Screen sharing:** background blur is temporarily disabled to avoid a SceneFX capture crash. Animations and shadows remain available. See [screen-sharing compatibility](#screen-sharing-compatibility).
 
-- **Window manager:** [mango](https://github.com/mangowm/mango) — a dwl-based Wayland compositor
-- **Status bar:** Waybar, with a CPU temperature sensor auto-detected at startup, a live tags module read straight from mango's own IPC, MPRIS media controls, and a calendar popup
-- **App launcher:** rofi, with rofi/fuzzel for the Control center
-- **Clipboard manager:** cliphist with a searchable GTK history, thumbnails and scrolling
-- **Notifications & OSD:** swaync for notifications, swayosd for on-screen volume/brightness feedback
-- **Screenshots:** grim + slurp
-- **Logout menu:** wlogout, themed
-- **Wallpaper:** waypaper (SUPER+F), with a bundled fallback wallpaper for the first boot
-- **Multi-monitor:** installation detects connected Linux DRM outputs and writes native `monitor_rule=` lines to `monitor.conf`, including from a TTY. Uses the preferred resolution and highest advertised refresh at that resolution when DRM access is available; otherwise lets Mango choose the mode. Personal rules in `local/monitor.conf` take precedence.
-- **Wallpaper-driven colors:** wallust regenerates `colors.conf` (mango borders), `waybar/colors.css` and Fish/terminal colors every time waypaper changes the wallpaper; mango hot-reloads on its own (`auto_reload_config`)
-- **Keyboard layout:** picked from a short menu during install and applied both to mango (`xkb_rules_layout`/`xkb_rules_variant`) and to the raw console (`/etc/vconsole.conf`), so it's consistent whether you're at a bare TTY or inside the graphical session
-- **GTK theming:** Materia-dark-compact applied the same way `nwg-look` would (gtk-3.0/gtk-4.0 `settings.ini`, `~/.gtkrc-2.0`, `GTK_THEME` env var)
-- **Shell:** fish, with the greeting disabled and fastfetch shown on every new terminal
-- **Terminal:** kitty
-- **Cursor theme:** bundled **Animated-Mew-Cursor**, installed in `~/.local/share/icons` in both installation modes. An existing selection is preserved when its theme is available; missing themes fall back to the bundled cursor. Mango and its session environment use the same selection.
-- **Bootloader theming (optional):** UltraGrub GRUB theme, plus a patch that cleans up boot entries (e.g. tidies the Windows entry for dual-boot)
-- **Display manager (optional):** [ly](https://github.com/fairyglade/ly), the default DM; hiding other sessions is an explicit opt-in with a backup
-- **Discord screen sharing** wired up correctly (`--ozone-platform=wayland` + PipeWire capturer) wherever Discord gets launched from
+## Contents
 
-### The installer
+- [Before you install](#before-you-install)
+- [Installation](#installation)
+- [First login](#first-login)
+- [Everyday controls](#everyday-controls)
+- [Keyboard shortcuts](#keyboard-shortcuts)
+- [Wallpaper colors and themes](#wallpaper-colors-and-themes)
+- [Update an existing installation](#update-an-existing-installation)
+- [Personal configuration](#personal-configuration)
+- [Troubleshooting](#troubleshooting)
+- [Backups and recovery](#backups-and-recovery)
+- [Project structure and development](#project-structure-and-development)
 
-- **Primary targets: Arch, Artix and CachyOS.** Fedora and NixOS remain experimental; neither has been validated by a full installation in this change.
-- **Multi-distro:** Arch/Artix/CachyOS/EndeavourOS (pacman), Fedora (dnf, best-effort), and NixOS (writes a config snippet instead of installing anything imperatively, since that's not how NixOS works)
-- **Init-system aware:** detects systemd / OpenRC / dinit and sets up `elogind` for seat management automatically when you're not on systemd
-- **Adds Arch's own repos when it makes sense:** on an Arch-based distro that doesn't already ship Arch's `[extra]` (e.g. Artix — CachyOS/EndeavourOS already have them, so this is a no-op there), offers to add them with a mirrorlist matched to your existing region
-- **`--dry-run`:** prints a read-only high-level plan and exits before privilege checks, network access, prompts or filesystem writes. It is not a command-by-command simulation.
-- **Doesn't nag for your password 20 times:** asks once up front and keeps the sudo session alive for the rest of the run
-- **Backups:** existing user configuration is copied to `~/.local/state/victoria/backups/install-*` (or `$XDG_STATE_HOME/victoria/backups`) before deployment, including an in-place Mango checkout. Relevant system files are backed up under `/var/backups/victoria-*`. Re-running can overwrite customizations; inspect and keep the backup.
-- **Application choices:** Discord and Spotify each have a yes/no prompt. Choose Helium, Firefox, Brave or no browser. Automatic startup is separately optional; shortcuts are generated for selected apps. “None” leaves the system browser default alone and removes SUPER+W from the deployed bindings.
-- **Qt theming:** installs Kvantum for Qt 5 and Qt 6 plus MateriaDark, alongside Materia-dark-compact for GTK.
+## Before you install
 
-## Config layout
+### Supported systems
 
-The config follows the layout of the current mango docs (0.16): `config.conf` pulls in `env.conf`, `bind.conf`, `rule.conf`, `monitor.conf`, `tag.conf` and `colors.conf` with `source=`. Validate any change without leaving your session with:
+| Distribution | Support |
+| --- | --- |
+| Arch, Artix, CachyOS | Primary targets |
+| EndeavourOS and other pacman-based distributions | Installer support; results depend on the distribution |
+| Fedora | Experimental; package coverage is best-effort |
+| NixOS | Experimental; generates a configuration snippet that you integrate and rebuild yourself |
 
-```
-mango -c ~/.config/mango/config.conf -p
-```
+Full installations have not been validated on every listed distribution. Automated tests cover configuration and installer behavior, not every package build, login manager or hardware combination.
 
-## Keybindings
+### Requirements
 
-| Keybind            | Action                                 |
-| ------------------- | --------------------------------------- |
-| SUPER + D           | App launcher (rofi)                    |
-| SUPER + 1...9       | Change tag/workspace                   |
-| ALT + 1...9         | Move program to tag/workspace          |
-| SUPER + V           | Clipboard history with image previews  |
-| SUPER + Shift + S   | Screenshot                             |
-| SUPER + Enter       | Terminal (kitty)                       |
-| SUPER + E           | File manager (nemo)                    |
-| SUPER + W           | Selected browser (if enabled)                       |
-| SUPER + A           | Discord (if enabled)                                |
-| SUPER + S           | Spotify (if enabled)                                |
-| SUPER + F           | Wallpaper selector (waypaper)          |
-| SUPER + Q           | Close active window                    |
-| ALT + F             | Toggle fullscreen                      |
-| ALT + M             | Quit window manager                    |
-| ALT + Tab           | Toggle overview                        |
+- Git, Bash and **Python 3.11 or newer** available before running the installer.
+- A normal user account with access to `sudo` for the full installation.
+- An internet connection and an interactive terminal for the full installation.
 
-## Requirements
+The installer offers an AUR helper on Arch-based systems if neither `yay` nor `paru` is available.
 
-Pick whichever matches your system — the installer detects it automatically:
+### What installation changes
 
-- **Arch-based:** Arch, Artix, CachyOS, EndeavourOS, or any other pacman-based distro, plus `git`. An AUR helper (`yay` or `paru`) is offered automatically if neither is found.
-- **Fedora:** a recent release with `dnf` and `git`. Package coverage here is best-effort — anything that fails to install is reported at the end instead of silently breaking the run.
-- **NixOS:** any recent generation. The installer writes a config snippet instead of installing packages; you add it to your flake/configuration.nix and rebuild yourself.
+The full installer installs packages, deploys user configuration, sets up desktop services and offers login-manager and theme choices. On Arch-based systems it performs a full `pacman -Syu` upgrade. Artix may require enabling Arch's `extra` repository; the installer asks before adding it.
 
-## How to install?
+Backups are created before configuration deployment. Read the prompts, especially those for Ly, hiding other login sessions, GRUB, the default shell and optional applications.
+
+**Run the installer as your normal user, not with `sudo ./install.sh`.** It requests elevated privileges when needed.
+
+## Installation
+
+### 1. Download the repository
+
+Keep the checkout **outside `~/.config/mango`**. That directory is the installed desktop configuration, not the source checkout.
 
 ```bash
+mkdir -p ~/src
+cd ~/src
 git clone https://github.com/kohagizpk/victoria-mangowm-dotfiles.git
 cd victoria-mangowm-dotfiles
-chmod +x install.sh
+```
+
+### 2. Preview the installation
+
+```bash
+./install.sh --dry-run
+```
+
+This prints a high-level plan without installing packages or changing files. It is not a simulation of every command.
+
+### 3. Run the installer
+
+```bash
 ./install.sh
 ```
 
-Want to see what it would do first, without changing anything?
+Follow the prompts to choose your keyboard layout, optional applications, browser and startup preferences. The installer then:
 
-```bash
-./install.sh --dry-run
-```
+1. Detects your distribution and init system.
+2. Backs up affected configuration and installs the required packages.
+3. Deploys desktop files to `~/.config/mango` and the relevant application directories.
+4. Detects monitors and configures the desktop, themes and wallpaper hook.
+5. Offers optional login-manager, shell and bootloader setup.
+6. Generates the initial color palette and reports missing components.
 
-The script is interactive: it walks you through a few quick choices up front (keyboard layout, and an AUR helper if you don't have one), shows a summary of everything it's about to do, and asks for confirmation before package installation. Configuration backups are created early, before deployment. Here's the gist of what happens, in order:
+If a step fails, read the error and the backup path before rerunning the installer.
 
-1. Requires an interactive terminal and a normal user, and checks connectivity with a timeout. `--dry-run` bypasses all execution steps.
-2. Detects your distro family and, on Arch-based systems, your init system — asking only if it can't tell.
-3. Asks for optional apps, browser, autostart and keyboard layout. Creates backups of existing user configuration.
-4. Asks for your sudo password once, and keeps the session alive for the rest of the run instead of prompting repeatedly.
-5. Performs a full `pacman -Syu` upgrade, avoiding partial upgrades. On an Arch-based distro without Arch's own `[extra]` repos (Artix, mainly), offers to add them with a mirrorlist matched to your region.
-6. Installs everything: the compositor, Waybar, launchers, portals, the PipeWire audio stack, GTK theming, fonts (including real Nerd Font icon glyphs, even on Fedora where the packaged font doesn't have them), and bundled apps.
-7. Deploys the dotfiles to `~/.config/mango` and adapts the few things that depend on your machine (elogind instead of systemd, a first-run wallpaper fallback, portals, your keyboard layout...). Every adaptation is logged and printed in the summary at the end.
-8. Auto-detects your CPU temperature sensor for Waybar and connected monitors for `monitor.conf`. Places screens side by side from `0,0`, with the laptop panel first when present; preserves personal monitor rules.
-9. Sets up the default display manager (`ly`), asks whether to hide other sessions, the cursor theme, and — optionally — the GRUB theme, your default shell, and the `video` group permission brightness control needs.
-10. Runs a health check at the end and tells you plainly if anything's missing.
+### Installation modes
 
-## Repository structure
+Run these commands from the repository checkout:
 
-| Path | Purpose |
+| Command | Purpose |
 | --- | --- |
-| `install.sh` | Entry point, installation modes and read-only plans |
-| `installer/` | Interactive flow, packages, desktop setup and explicit deployment mapping |
-| `config/mango/` | Compositor, bindings, monitors and autostart |
-| `config/waybar/`, `config/rofi/`, `config/fuzzel/`, `config/wlogout/` | Bar and menus |
-| `config/fish/`, `config/kitty/`, `config/fastfetch/` | Shell and terminal defaults |
-| `config/wallust/` | One source of truth for generated color templates |
-| `themes/` | Bundled cursor and UltraGrub, with upstream licenses |
-| `wallpapers/`, `assets/` | Wallpapers and README media |
-| `scripts/` | Session helpers and read-only diagnostics |
-| `docs/`, `tests/` | Maintenance guide and isolated regression tests |
+| `./install.sh` | Full interactive installation, including packages and system integration |
+| `./install.sh --config-only` | Back up and deploy dotfiles without installing packages or changing system services |
+| `./install.sh --diagnose` | Read-only dependency and configuration checks |
+| `./install.sh --dry-run` | Preview the full installation plan |
+| `./install.sh --config-only --dry-run` | Preview configuration deployment |
+| `./install.sh --help` | Show available options |
 
-The checkout must live **outside `~/.config/mango`**, for example in `~/src/victoria-mangowm-dotfiles`.
-The installer maps organized source files to the existing runtime paths; session scripts do not need a migration.
-Only runtime files are deployed, not Git history, tests or installer modules.
+Use the full installer on a fresh machine. Configuration-only mode expects the desktop dependencies to be installed already.
 
-```bash
-./install.sh --config-only --dry-run  # preview without writes
-./install.sh --config-only            # back up and update dotfiles only
-./install.sh --diagnose               # report missing components, without changes
-```
+## First login
 
-Configuration-only mode does not install packages, configure Ly, modify services or apply system themes.
-It preserves existing app preferences, bindings, environment, Kitty/Fastfetch configuration and personal overrides.
-Use the full interactive installer for GTK/Kvantum setup and package choices.
-Wallust refreshes Waybar, borders, Fish, Rofi, Fuzzel and wlogout; missing Wallust leaves fallback colors and an actionable warning.
-See [maintenance and personal overrides](docs/maintenance.md).
+Log out of your current desktop and select **Mango** in your login manager. A new login allows applications to receive the updated theme and session environment.
 
-## Victoria Settings
+- Open **Victoria Settings** with **Super + comma**, the launcher or the gear before the Waybar microphone.
+- Review keyboard, display and application choices in **Setup**. Display changes have a timed confirmation so an unusable layout can revert.
+- Choose a wallpaper with **Super + F**. Colors update automatically.
+- Turn off **Open Settings automatically at login** if you do not want the setup window to appear at startup.
 
-Open **Victoria Settings** from the application launcher or press **Super + comma**.
-The GTK4 panel uses the desktop palette and includes:
+`Super` usually means the Windows key. Interface text uses English; keyboard layout and timezone are independent.
 
-- **Personalize:** five collapsible groups (Appearance, Bar & clock, Notifications, Mouse & touchpad, Lock & idle), with an always-visible Apply button. Configure bar modules, edge spacing, 12/24-hour clock and seconds; notification corner, duration, width and images; cursor size, pointer focus, natural scrolling and tap-to-click. Critical notifications retain their own timeout. Includes live in-panel preview of interface font size, spacing, borders, corners and opacity; animation controls (blur temporarily disabled for screen-sharing compatibility); top/bottom Waybar; wallpaper colors or a fixed accent. Changes are applied explicitly.
-- **Profiles:** Minimal (compact, no effects), Comfort (larger text, restrained effects), and Effects (blur and animation).
-- **Setup:** four steps for keyboard, detected monitors and scale, application shortcuts, and a final review. Display changes revert after 20 seconds unless confirmed. Applications must already be installed. Console layout and timezone are not changed.
-- **Shortcuts:** search the actual bindings loaded through Mango's source files. Open directly with **Super + slash**.
-- **Focus mode:** **Super + Shift + F** enables Do Not Disturb and hides secondary Waybar modules. Leaving restores the previous DND setting and the original module configuration. A FOCUS button in the bar also leaves this mode.
-- **Diagnostics:** dependency, compositor, audio and wallpaper checks with explanations, plus explicit actions to refresh colors, restore wallpaper and reload notifications.
+## Everyday controls
 
-The first-run setup opens at login until completed or disabled with **Open Settings automatically at login**. Settings live in `~/.config/mango/local/settings.json` and a marked block in `local/custom.conf`; personal content outside that block is preserved. Profiles affect desktop components rather than changing every application's own font settings. No updater or update rollback feature is included.
+| Component | What it does |
+| --- | --- |
+| **Victoria Settings** | Appearance, profiles, Waybar modules, clock, notifications, cursor size, input preferences and lock/idle timers |
+| **Control center** | Wi-Fi, Bluetooth, audio devices, hardware power profiles, screen off and suspend |
+| **Waybar** | Workspace tags, media controls, detected CPU temperature and desktop shortcuts |
+| **Audio mixers** | Right-click the speaker for output/application volumes; right-click the microphone for input selection and volume |
+| **SwayNC** | Notifications, an English calendar, Do Not Disturb and visual performance controls; right-click the clock to open it |
+| **Clipboard history** | Search, image thumbnails, scrolling and older entries; opens near the input field when available, otherwise near the pointer |
+| **Screenshots** | Select a region with Super + Shift + S |
+| **Lock screen** | Hyprlock with a blurred wallpaper, clock and password field; enter your existing login password |
+| **Power menu** | Wallpaper-colored lock, logout, suspend and power actions |
 
-GTK4 and Python GObject are required (`gtk4 python-gobject` on Arch/Artix; `gtk4 python3-gobject` on Fedora). The installer includes them on these distributions. NixOS remains experimental and requires a Python environment providing PyGObject and the GTK4 typelib.
+The Control center opens from the sliders beside the Waybar power button or **Super + C**. Wi-Fi authentication uses a graphical password dialog. Bluetooth pairing is available through Blueman. Set `VICTORIA_MENU=fuzzel` to use Fuzzel instead of Rofi for the menu.
 
-## Control center, lock and performance
+### Idle, focus and performance
 
-- **Super + C** or the Waybar sliders beside the power button opens the Rofi control center. Set `VICTORIA_MENU=fuzzel` to use Fuzzel instead. Wi-Fi uses a graphical password dialog; Bluetooth uses paired devices and Blueman for pairing. Audio switching updates the default device and existing streams. Energy profiles use power-profiles-daemon and only list profiles reported by the hardware.
-- **Super + L** locks with **Hyprlock**: blurred wallpaper, live palette, clock and an always-visible password field. Enter your existing login password and press Enter. A compositor lock confirmation is required before powering down screens or suspending. Swaylock is a fallback if Hyprlock is unavailable. Wlogout uses the same lock-first path.
-- **Settings → Personalize → Lock & idle** controls optional lock, screen-off and suspend timeouts. Automatic idle actions start disabled; `0` disables automatic suspension. The managed swayidle instance still locks before system sleep. It respects compositor idle inhibitors and never terminates another unmanaged swayidle instance.
-- **Super + Shift + P** toggles performance mode: Mango window/tag/layer animations, blur and shadows are disabled together. A final `local/performance.conf` overlay leaves personal settings intact and restores them when turned off. This is independent of the CPU energy profile.
-- The Waypaper hook publishes one wallpaper palette to Waybar, Rofi, Fuzzel, SwayNC, wlogout, Mango borders, Fish, **Kitty**, **GTK3/GTK4**, and QuickCSS in existing **Vencord/Vesktop** installations. User files receive a bounded Victoria block and original copies are kept in `~/.local/state/victoria/theme-originals`. Existing Kitty/GTK windows may need reopening; sandboxed applications and Discord clients without Vencord are not modified. QuickCSS must be enabled in Vencord.
+Automatic idle actions start disabled. Configure their timeouts in **Settings → Personalize → Lock & idle**. A managed swayidle instance still handles locking before system sleep. Screen-off uses a wake listener and a recovery timer.
 
-Control-center dependencies on Arch/Artix: `networkmanager bluez bluez-utils blueman libpulse power-profiles-daemon`. Enable the appropriate services for your init system (on Artix/dinit, `power-profiles-daemon-dinit` provides the power service). The center reports missing services without pretending that an action succeeded.
+**Visual performance** disables desktop effects without changing your saved appearance preferences. Toggle it in the calendar panel or with **Super + Shift + P**. Turning it off restores permitted effects; background blur remains disabled by the compatibility workaround.
 
-## Desktop updates
+**Hardware power profiles** in the Control center are separate: they change the hardware's energy policy and only appear when supported by the service and hardware.
 
-- The notification center includes an English calendar with Previous, Today and Next controls. Right-click the Waybar clock to open it. SwayNC 0.12-compatible widgets are used; this is a date viewer, not an event agenda.
-- Notifications use the wallpaper palette and rounded surfaces shared with Waybar. Installation backs up and replaces the managed SwayNC configuration and stylesheet.
-- Wallpaper restoration and palette generation finish before Waybar starts. Repeated launcher calls leave the existing bar alone. The last successfully selected wallpaper is saved under `$XDG_STATE_HOME/victoria/last-wallpaper` (default `~/.local/state`).
-- The bundled Wallust configuration uses the 4.x format (`resized` backend, `kmeans` palette, `dark` style). The theme hook detects Wallust 3.x and adapts those options for rendering without rewriting your configuration.
-- Occupied tags use brighter, heavier numbers; empty tags are subdued. Background blur is temporarily disabled for screen-sharing compatibility. Super-drag keeps tiled windows at their normal size.
-- Desktop messages and dates use English. Keyboard layout and timezone remain independently configurable.
+**Focus mode**, toggled with **Super + Shift + F**, enables Do Not Disturb and hides secondary bar modules. Leaving it restores the previous notification state.
 
-## Known issues and validation limits
+See the [desktop controls guide](docs/desktop-controls.md) for more detail.
 
-The concrete configuration issues from the previous list are addressed:
+## Keyboard shortcuts
 
-- Monitor rules are generated for detected hardware, instead of shipping the author's two outputs. Legacy untouched defaults are migrated; edited personal layouts are preserved and loaded first because Mango uses the first matching monitor rule.
-- The cursor default now refers to the bundled Animated Mew theme. Its `index.theme` and `cursor.theme` were already plain-text INI files; regression tests now verify this and the stale warning has been removed.
-- App rules no longer require DP-1/HDMI-A-1, and XWayland's default DPI now matches the generated scale of 1.
+These are the defaults. Existing custom bindings are preserved during configuration-only updates; use **Super + /** to inspect the bindings actually loaded on your machine.
 
-Remaining limits:
+| Shortcut | Action |
+| --- | --- |
+| Super + D | Application launcher |
+| Super + comma | Victoria Settings |
+| Super + C | Control center |
+| Super + / | Shortcut guide |
+| Super + Enter | Terminal |
+| Super + E | File manager |
+| Super + W | Selected browser, if enabled |
+| Super + A / Super + S | Discord / Spotify, if enabled |
+| Super + F | Wallpaper selector |
+| Super + V | Clipboard history |
+| Super + Shift + S | Region screenshot |
+| Super + L | Lock screen |
+| Super + Shift + P | Toggle visual performance |
+| Super + Shift + F | Toggle focus mode |
+| Super + 1–9 | Switch workspace/tag |
+| Alt + 1–9 | Move the focused window to a tag |
+| Super + Q | Close the focused window |
+| Alt + F | Toggle fullscreen |
+| Alt + A | Toggle floating |
+| Alt + Tab | Window overview |
+| Super + left/right mouse drag | Move / resize a window |
+| Alt + R | Reload Mango configuration |
+| Alt + M | Leave the Mango session |
 
-- Without permission to read DRM modes or without `libdrm.so.2`, sysfs supplies connector names and preferred sizes for placement; the compositor selects the mode/refresh. No fabricated timings or overclocking are applied. With no readable connected outputs, no monitor rules are forced.
-- Duplicate connector names across GPUs are skipped rather than guessed; configure those setups manually. Physical left/right order, rotation and desired scaling cannot be inferred from connector names: use `local/monitor.conf`. Detection runs during installation/update, not continuously when a monitor is plugged in.
-- Full package installation, Ly login and the resulting Mango session still need testing on real Arch/Artix/CachyOS hardware. Fedora/NixOS remain experimental. Automated tests do not replace this validation.
+## Wallpaper colors and themes
 
-See [monitor setup and maintenance](docs/maintenance.md) for preview and regeneration commands.
+Waypaper selects the wallpaper; Wallust generates the palette. One hook updates Waybar, Mango borders, Rofi, Fuzzel, SwayNC, wlogout icons, Fish, Kitty, GTK3/GTK4 and supported Qt themes. Existing Vencord/Vesktop installations can receive matching QuickCSS; enable QuickCSS in the client.
 
-## Credits
+The bundled configuration uses **Wallust 4.x syntax**. The theme helper detects **Wallust 3.x** and translates its rendering options without rewriting the source configuration. CI tests the real Wallust 3.5.1 renderer; local validation also covers 4.1.0-alpha.
 
-- [mango](https://github.com/mangowm/mango) by DreamMaoMao and contributors
-- [UltraGrub](https://github.com/YouStones/ultrakill-grub-theme) GRUB theme
-- [Nerd Fonts](https://www.nerdfonts.com/) for the icon glyphs
-- [Animated Mew Cursor](https://www.gnome-look.org/c/2326996) cursor theme
+GTK uses **Materia-dark-compact**. Qt applications such as Ark and qBittorrent use **Kvantum**, with a generated **VictoriaWallustDark** theme based on MateriaDark. The installer includes Qt 5 and Qt 6 integration on the primary distributions.
 
-## Dark theme: GTK and Qt
+Some applications need reopening after a theme change. Flatpak applications, custom application themes and Libadwaita may not reproduce the host theme exactly. GTK theme settings alone do not configure Qt applications.
 
-The installer selects **Materia-dark-compact** for GTK 2/3/4 and **MateriaDark**
-for Qt widgets through Kvantum. Qt has a separate theme engine; MateriaDark is
-not an identical compact port. The Arch-family dependencies are `materia-gtk-theme`,
-`kvantum`, `kvantum-qt5` and `kvantum-theme-materia`.
+Wallpaper restoration runs before Waybar starts. Repeated launcher calls avoid starting a second bar. Generated palettes are validated before replacing the previous working colors.
 
-The style environment is set in `env.conf` for programs launched by Mango and
-exported by `autostart.sh` for its children and D-Bus activation. GSettings also
-receives `prefer-dark` when available. Log out and back in after installing;
-already-running apps keep their old environment.
+## Update an existing installation
 
-For **Ark and qBittorrent**, use the native package and disable any custom
-application theme/style override if it prevents Kvantum from taking effect.
-GTK theme settings alone cannot style these Qt apps. Flatpak applications need
-matching themes/plugins inside their runtime; host Kvantum does not automatically
-style them. Libadwaita apps normally follow the dark preference, but do not promise
-the exact Materia widget appearance. No custom qBittorrent settings are erased.
-
-Upstream references: [Materia GTK](https://github.com/nana-4/materia-theme),
-[Materia KDE](https://github.com/PapirusDevelopmentTeam/materia-kde),
-[Kvantum installation](https://github.com/tsujan/Kvantum/blob/master/Kvantum/INSTALL.md).
-
-## Verification and recovery
-
-Run the isolated regression suite without installing anything:
+Update the source checkout, then deploy the configuration:
 
 ```bash
-python3 -m unittest discover -s tests -v
-bash -n install.sh
-./install.sh --dry-run
+cd ~/src/victoria-mangowm-dotfiles
+git pull --ff-only
+./install.sh --config-only --dry-run
+./install.sh --config-only
+./install.sh --diagnose
 ```
 
-The suite checks all 16 browser/Discord/Spotify combinations, backup preservation,
-repeated app configuration, Qt settings, dry-run side effects, shell syntax and
-Waybar retry/cleanup behavior with mocked applications. GitHub Actions runs it on
-pushes and pull requests. These tests do **not** replace booting a real Arch/Artix/
-CachyOS machine, building AUR packages, testing Ly or visually checking Qt apps.
+If Git reports local changes or diverged history, resolve those changes before updating; do not discard your work just to force the pull.
 
-The installer prints its backup locations. To recover, close the affected apps,
-inspect the backup and copy back the individual configuration directories you want
-to restore (for example `.config/kitty`). GSettings values are recorded separately
-in `gtk-theme.gsettings` and `color-scheme.gsettings`; restoring files does not
-restore those settings. Backups do not roll back package upgrades, service enablement,
-group membership or shell changes. Hidden sessions retain their full paths below
-`/etc/mango-removed-sessions-*` and can be moved back individually.
+Configuration-only updates preserve personal overrides and existing bindings, while applying managed migrations such as the clipboard command and screen-sharing blur workaround. They also update managed styles and theme integration. They **do not install newly required packages**; review diagnostics and use the full installer when dependency or system setup is needed.
 
-Wallust prefers HDMI-A-1 as before, but falls back to another active wallpaper if
-that output is absent. Set `VICTORIA_COLOR_MONITOR` to choose another preferred output.
-Spicetify is now applied manually after Spotify updates, rather than restoring and
-patching Spotify on every login.
+## Personal configuration
 
+Keep custom changes in `~/.config/mango/local/`:
 
-## Wallpaper palette and visual refresh
+| File | Purpose |
+| --- | --- |
+| `input.conf` | Keyboard layout and repeat settings |
+| `monitor.conf` | Monitor positions, resolution, rotation and scale |
+| `custom.conf` | Personal compositor options; Settings maintains a marked block here |
+| `settings.json` | Saved preferences managed by Victoria Settings |
+| `autostart.sh` | Extra personal startup commands |
+| `performance.conf` | Generated visual-performance override; do not use for permanent preferences |
 
-Waybar uses three floating groups with consistent padding, a subtle outline and
-readable foreground text. Active workspaces and controls inherit the wallpaper
-accent. Mango keeps its layouts and animations with 12px corners, 10px outer gaps
-and 96% inactive-window opacity. Kitty uses 88% opacity and 10px padding.
+Monitor detection uses available driver modes and does not invent refresh rates. It cannot infer your physical monitor arrangement. Detection runs during installation, not continuously; use Setup or personal monitor rules for your layout. Ambiguous connector names across multiple GPUs may need manual configuration.
 
-The installer copies all Wallust templates into `~/.config/wallust/templates`,
-sets Waypaper to `awww`, and generates the initial palette **during installation**.
-It uses the saved wallpaper (preferring HDMI-A-1), including Waypaper's XDG state
-file, or `wallpaper/wallpaper.jpg` on a fresh setup. No running compositor is needed
-for that first generation. The managed config targets Wallust **3.x**, validated
-in CI with 3.5.1: `backend = "kmeans"`, `palette = "dark"`, `check_contrast = true`.
+Avoid editing generated color files. Change templates under `config/wallust/templates/` in the source checkout instead.
 
-The Fish loader lives in `~/.config/fish/conf.d/victoria-wallust.fish`; your prompt,
-PATH and `config.fish` are preserved. Terminal background/foreground/ANSI colors
-and Fish syntax/prompt variables follow the wallpaper. New terminals load the
-palette immediately; open Fish sessions refresh **at the next prompt**. Prompts
-with their own hardcoded RGB colors may override the Fish color variables.
+## Troubleshooting
 
-At login, `scripts/wallpaper-start.sh` waits for awww, restores Waypaper and
-synchronizes the palette. On wallpaper changes, the post-command uses
-`scripts/wallust-reload.sh`. It serializes updates, renders into staging, checks
-all outputs, and only then publishes the generated files and Fish cache. A failed
-or incomplete Wallust render keeps the last complete palette. Existing unrelated
-Waypaper post-commands are retained; an empty or old Victoria hook is repaired.
+Start with the read-only diagnostic:
 
-To regenerate manually (after configuration has been installed):
+```bash
+./install.sh --diagnose
+```
+
+| Symptom | What to check |
+| --- | --- |
+| Missing program or control | Read the diagnostic output; configuration-only mode does not install dependencies |
+| Colors do not update | Run the refresh command below and inspect the Wallust log |
+| Qt apps remain light | Confirm Kvantum and MateriaDark are installed, reopen the app and check its custom theme settings |
+| Settings opens on every login | Disable **Open Settings automatically at login** in Settings |
+| Incorrect monitor arrangement | Review Setup and `local/monitor.conf` |
+| Screen sharing freezes | See the compatibility note below; do not re-enable background blur on affected setups |
+
+Refresh the current wallpaper colors:
 
 ```bash
 bash ~/.config/mango/scripts/wallust-reload.sh
 ```
 
-Diagnostics: `${XDG_CACHE_HOME:-$HOME/.cache}/wallust/victoria.log`.
-The automated tests cover setup, saved/active/missing monitors, XDG state, repeated
-installation, custom hooks, failed rendering and native GTK CSS parsing. CI also
-runs the real Wallust renderer and Fish loader. Full compositor/DM installation
-and screenshot-level validation still require a real desktop session.
+Wallust logs are in `~/.cache/wallust/victoria.log`, or `$XDG_CACHE_HOME/wallust/victoria.log` when configured.
 
-## Desktop controls and feature guide
+Check Mango configuration syntax before restarting your session:
 
-See [Desktop controls](docs/desktop-controls.md) for the settings panel, Control center,
-Wi-Fi authentication, audio mixers, clipboard browser, lock/idle, visual performance,
-and wallpaper-driven GTK/Qt themes. All are deployed by `install.sh`; no separate
-manual copying is required.
+```bash
+mango -c ~/.config/mango/config.conf -p
+```
 
-See [Project layout](docs/project-layout.md) for the source/runtime directory mapping.
+### Screen-sharing compatibility
 
-Screen-sharing compatibility: blur is temporarily disabled, including existing saved
-profiles, to avoid SceneFX capture crashes. See [details](docs/desktop-controls.md#screen-sharing-compatibility).
+[SceneFX issue #198](https://github.com/wlrfx/scenefx/issues/198) documents a capture failure with blur enabled. The portal can exit with `Invalid buffer damage coordinates`, interrupting sharing across applications. The reported Victoria setup also froze when Settings appeared on the captured DP monitor; disabling blur restored sharing.
+
+For compatibility, Victoria disables compositor background blur in new installations, saved profiles and migrated overrides. The Settings switch explains this restriction. Animations, shadows and Hyprlock's wallpaper blur remain available.
+
+This is a **workaround**, not an upstream repair or a guarantee against every capture failure. Re-enabling blur requires verifying a fixed SceneFX version with your compositor and monitor setup.
+
+## Backups and recovery
+
+User configuration backups are stored under:
+
+```text
+~/.local/state/victoria/backups/install-*
+```
+
+If `XDG_STATE_HOME` is set, the location is `$XDG_STATE_HOME/victoria/backups`. The installer prints the exact path. Relevant system changes have separate backup locations reported during installation.
+
+To recover a configuration, close the affected application, inspect the backup and restore the specific files you need. Backups do not undo package upgrades, service changes, group membership or a changed login shell. GSettings values require separate restoration; copying configuration files alone does not restore them.
+
+There is no automatic update-and-rollback feature.
+
+## Project structure and development
+
+| Directory | Contents |
+| --- | --- |
+| `installer/` | Package selection, deployment and system integration |
+| `config/` | Compositor and application configuration templates |
+| `scripts/` | Settings, session controls, themes and desktop helpers |
+| `themes/`, `wallpapers/` | Bundled desktop assets |
+| `assets/` | Preview media |
+| `tests/` | Isolated regression tests |
+| `docs/` | Detailed desktop and maintenance guides |
+
+Run checks from the source checkout:
+
+```bash
+python3 -m unittest discover -s tests -v
+bash -n install.sh
+./install.sh --dry-run
+git diff --check
+```
+
+Tests use temporary directories rather than the real home configuration. Pillow is needed for cursor tests; the Fish and Wallust integration checks use those binaries when installed. GitHub Actions installs these test dependencies and runs the suite on pushes and pull requests. Full installation and graphical behavior still require testing on real hardware.
+
+Further reading: [Desktop controls](docs/desktop-controls.md) · [Project layout](docs/project-layout.md) · [Maintenance guide, in Portuguese](docs/maintenance.md).
+
+## Credits
+
+Built with [Mango](https://github.com/mangowm/mango) and the work of its contributors, alongside Waybar, Rofi/Fuzzel, SwayNC, Wallust, Waypaper, Hyprlock, PipeWire and the Wayland desktop ecosystem.
+
+Bundled themes and assets include [UltraGrub](https://github.com/YouStones/ultrakill-grub-theme), [Nerd Fonts](https://www.nerdfonts.com/), [Animated Mew Cursor](https://www.gnome-look.org/c/2326996), [Materia GTK](https://github.com/nana-4/materia-theme) and [Materia KDE](https://github.com/PapirusDevelopmentTeam/materia-kde), used with [Kvantum](https://github.com/tsujan/Kvantum).
