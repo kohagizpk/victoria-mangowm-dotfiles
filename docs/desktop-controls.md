@@ -91,3 +91,8 @@ capture damage with blur and multiple outputs. The matching local failure was
 blur restored capture in the reported setup, including Settings on the DP output.
 This is a workaround, not a replacement for an upstream SceneFX fix. Re-enable the
 control only after verifying the fixed library and cross-output capture together.
+
+Brazil ABNT2 uses XKB layout `br`, variant `abnt2`, and model `abnt2`.
+The console keymap is `br-abnt2`. When clearing a variant in Mango,
+write `xkb_rules_variant=""`: a bare empty assignment is not parsed correctly
+and can leave an earlier variant (such as `intl`) active.

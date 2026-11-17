@@ -24,6 +24,20 @@ class SettingsTests(unittest.TestCase):
         for key, value in [('HOME', self.home), ('MANGO', self.mango), ('LOCAL', self.local), ('STATE', self.state)]:
             p = patch.object(settings, key, value); p.start(); self.addCleanup(p.stop)
 
+    def test_keyboard_switch_replaces_international_variant_and_model(self):
+        p = self.local / 'input.conf'
+        p.write_text('repeat_rate=30\nxkb_rules_layout=us\nxkb_rules_variant=intl\nxkb_rules_model=pc105\n')
+        (self.mango / 'bind.conf').write_text('')
+        with patch.object(settings, 'check_mango'):
+            for choice, expected in [('Brazil ABNT2', ('br', 'abnt2', 'abnt2')),
+                                     ('US', ('us', '""', 'pc105')),
+                                     ('US international', ('us', 'intl', 'pc105'))]:
+                settings.apply_setup(choice, 'Keep current', 1, 'Keep current', 'Keep current')
+                values = dict(line.split('=', 1) for line in p.read_text().splitlines() if '=' in line)
+                self.assertEqual(tuple(values['xkb_rules_' + key] for key in ('layout', 'variant', 'model')), expected)
+                self.assertEqual(values['repeat_rate'], '30')
+                self.assertEqual(p.read_text().count(settings.BEGIN), 1)
+
     def test_saved_blur_is_disabled_for_screencast_compatibility(self):
         (self.local / 'settings.json').write_text(json.dumps({'blur': True}))
         (self.local / 'custom.conf').write_text('blur=1\nblur_layer=1\n')

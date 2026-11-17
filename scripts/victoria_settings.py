@@ -336,7 +336,7 @@ def display_rules(scale, outputs=None):
 
 
 def apply_setup(keyboard, layout, scale, terminal, browser):
-    choices = {'US': ('us', ''), 'US international': ('us', 'intl'), 'Brazil ABNT2': ('br', '')}
+    choices = {'US': ('us', '""', 'pc105'), 'US international': ('us', 'intl', 'pc105'), 'Brazil ABNT2': ('br', 'abnt2', 'abnt2')}
     if keyboard not in choices or terminal not in ('Keep current', 'kitty', 'foot') or browser not in ('Keep current', 'firefox', 'helium-browser', 'brave'):
         raise ValueError('Unsupported setup selection.')
     for app in (terminal, browser):
@@ -345,9 +345,9 @@ def apply_setup(keyboard, layout, scale, terminal, browser):
     paths = [LOCAL / 'input.conf', LOCAL / 'monitor.conf', MANGO / 'bind.conf']
     before = snapshot(paths)
     try:
-        kb, variant = choices[keyboard]
+        kb, variant, model = choices[keyboard]
         p = paths[0]
-        atomic(p, managed(p.read_text() if p.exists() else '', f'xkb_rules_layout={kb}\nxkb_rules_variant={variant}'))
+        atomic(p, managed(p.read_text() if p.exists() else '', f'xkb_rules_layout={kb}\nxkb_rules_variant={variant}\nxkb_rules_model={model}'))
         if layout == 'Automatic side by side':
             atomic(paths[1], display_rules(scale))
         elif layout != 'Keep current':

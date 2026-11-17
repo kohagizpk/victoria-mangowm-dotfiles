@@ -119,6 +119,10 @@ if [[ "$KB_LAYOUT" =~ ^([a-zA-Z0-9_-]+)\(([a-zA-Z0-9_-]+)\)$ ]]; then
     KB_LAYOUT="${BASH_REMATCH[1]}"
 fi
 
+# Mango requires a nonempty token before stripping quotes.
+KB_VARIANT="${KB_VARIANT:-\"\"}"
+KB_MODEL="${KB_MODEL:-pc105}"
+
 if [[ -n "$KB_LAYOUT" && -f "$CONFIG_DIR/config.conf" ]]; then
     if grep -q '^xkb_rules_layout=' "$CONFIG_DIR/config.conf"; then
         run_sed -i "s/^xkb_rules_layout=.*/xkb_rules_layout=${KB_LAYOUT}/" "$CONFIG_DIR/config.conf"
@@ -135,8 +139,8 @@ if [[ -n "$KB_LAYOUT" && -f "$CONFIG_DIR/config.conf" ]]; then
 fi
 
 # Apply the explicitly chosen keyboard over any previously migrated override.
-sed -i '/^xkb_rules_layout[[:space:]]*=/d; /^xkb_rules_variant[[:space:]]*=/d' "$CONFIG_DIR/local/input.conf"
-printf '\nxkb_rules_layout=%s\nxkb_rules_variant=%s\n' "$KB_LAYOUT" "$KB_VARIANT" >> "$CONFIG_DIR/local/input.conf"
+sed -i '/^[[:space:]]*xkb_rules_\(layout\|variant\|model\)[[:space:]]*=/d' "$CONFIG_DIR/local/input.conf"
+printf '\nxkb_rules_layout=%s\nxkb_rules_variant=%s\nxkb_rules_model=%s\n' "$KB_LAYOUT" "$KB_VARIANT" "$KB_MODEL" >> "$CONFIG_DIR/local/input.conf"
 
 if [[ -n "${KB_CONSOLE:-}" ]]; then
     if [[ "$DISTRO_FAMILY" == "nixos" ]]; then

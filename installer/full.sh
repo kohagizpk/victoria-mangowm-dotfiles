@@ -373,9 +373,10 @@ while [[ ! "$kb_reply" =~ ^([1-9]|10)$ ]]; do
     read -rp "Keyboard layout [1-10]: " kb_reply
 done
 KB_VARIANT=""
+KB_MODEL="pc105"
 case "$kb_reply" in
     1)  KB_LAYOUT="us"; KB_CONSOLE="us" ;;
-    2)  KB_LAYOUT="br"; KB_CONSOLE="br-abnt2" ;;
+    2)  KB_LAYOUT="br"; KB_VARIANT="abnt2"; KB_MODEL="abnt2"; KB_CONSOLE="br-abnt2" ;;
     3)  KB_LAYOUT="us"; KB_VARIANT="intl"; KB_CONSOLE="us-acentos" ;;
     4)  KB_LAYOUT="de"; KB_CONSOLE="de" ;;
     5)  KB_LAYOUT="fr"; KB_CONSOLE="fr" ;;
