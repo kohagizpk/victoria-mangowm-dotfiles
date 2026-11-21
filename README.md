@@ -2,7 +2,7 @@
 
 Personal dotfiles for a [mango](https://github.com/mangowm/mango) (dwl-based Wayland compositor) desktop — Waybar, a full Wayland utility stack, GRUB theming, and an installer that adapts itself to your distro, your init system, and your hardware.
 
-https://github.com/user-attachments/assets/cb902017-0d69-4222-970d-5467773197c4
+https://github.com/user-attachments/assets/5ad00014-64fa-4ea0-8588-aad44244a558
 
 ## Features
 
