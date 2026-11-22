@@ -108,7 +108,7 @@ Use the full installer on a fresh machine. Configuration-only mode expects the d
 
 Log out of your current desktop and select **Mango** in your login manager. A new login allows applications to receive the updated theme and session environment.
 
-- Open **Victoria Settings** with **Super + comma**, the launcher or the gear before the Waybar microphone.
+- Open **Victoria Settings** with **Super + comma**, the launcher or the gear before the microphone.
 - Review keyboard, display and application choices in **Setup**. Display changes have a timed confirmation so an unusable layout can revert.
 - Choose a wallpaper with **Super + F**. Colors update automatically.
 - Turn off **Open Settings automatically at login** if you do not want the setup window to appear at startup.
@@ -121,15 +121,33 @@ Log out of your current desktop and select **Mango** in your login manager. A ne
 | --- | --- |
 | **Victoria Settings** | Appearance, profiles, Waybar modules, clock, notifications, cursor size, input preferences and lock/idle timers |
 | **Control center** | Wi-Fi, Bluetooth, audio devices, hardware power profiles, screen off and suspend |
-| **Waybar** | Workspace tags, media controls, detected CPU temperature and desktop shortcuts |
+| **Quickshell bar** | Default bar with workspace tags, media, system tray, CPU temperature and native audio/calendar popups. Waybar remains available as a fallback. |
+| **Media player** | Right-click the Waybar song to toggle a compact horizontal player: rotating album record, previous/play/pause/next, progress and player selection. Esc closes it; colors follow Wallust live. Uses the existing GTK4 dependencies. |
 | **Audio mixers** | Right-click the speaker for output/application volumes; right-click the microphone for input selection and volume |
-| **SwayNC** | Notifications, an English calendar, Do Not Disturb and visual performance controls; right-click the clock to open it |
+| **SwayNC** | Notifications and Do Not Disturb. Right-click the Quickshell clock for the native calendar, DND and performance controls; Waybar uses the SwayNC calendar. |
 | **Clipboard history** | Search, image thumbnails, scrolling and older entries; opens near the input field when available, otherwise near the pointer |
 | **Screenshots** | Select a region with Super + Shift + S |
 | **Lock screen** | Hyprlock with a blurred wallpaper, clock and password field; enter your existing login password |
 | **Power menu** | Wallpaper-colored lock, logout, suspend and power actions |
 
-The Control center opens from the sliders beside the Waybar power button or **Super + C**. Wi-Fi authentication uses a graphical password dialog. Bluetooth pairing is available through Blueman. Set `VICTORIA_MENU=fuzzel` to use Fuzzel instead of Rofi for the menu.
+The Control center opens from the sliders beside the power button or **Super + C**. Wi-Fi authentication uses a graphical password dialog. Bluetooth pairing is available through Blueman. Set `VICTORIA_MENU=fuzzel` to use Fuzzel instead of Rofi for the menu.
+
+### Victoria Quickshell bar
+
+The default bar uses Quickshell 0.3.2+, with native QML media, audio and calendar popups.
+It reads the existing Wallust `waybar/colors.css` palette live; no second palette generator is needed.
+Mango tags use `mmsg watch all-tags`; media and tray use Quickshell services.
+Settings (visibility, clock, position, margin and focus mode) remain in Victoria Settings.
+Right-click audio/microphone, music or clock for the respective popup; Esc closes it.
+The original Waybar remains available:
+
+```sh
+bash ~/.config/mango/scripts/bar-switch.sh waybar
+bash ~/.config/mango/scripts/bar-switch.sh quickshell
+```
+
+Quickshell must be built against the installed Qt version. The bar keeps SwayNC and
+the existing control center, settings and power actions.
 
 ### Idle, focus and performance
 
@@ -142,6 +160,26 @@ Automatic idle actions start disabled. Configure their timeouts in **Settings �
 **Focus mode**, toggled with **Super + Shift + F**, enables Do Not Disturb and hides secondary bar modules. Leaving it restores the previous notification state.
 
 See the [desktop controls guide](docs/desktop-controls.md) for more detail.
+
+### Idle resource usage
+
+Quickshell caches audio queries for up to 30 seconds and invalidates them on
+PulseAudio/PipeWire events (volume and device changes still update on the next
+2-second sample). Network discovery runs at most once every 15 seconds; traffic
+counters still update every sample. Cava runs only while an unmuted playback
+stream is active, including players without MPRIS. The clock uses minute precision
+when seconds are disabled. Bar launchers prevent duplicate Quickshell instances.
+
+XWayland persistence is disabled: after the next login, it can exit when the last
+X11 client closes. Starting an X11 application may consequently take a little
+longer. Local overrides can restore `xwayland_persistence=1`.
+
+For this Artix/dinit installation, `maintenance/disable-unused-services.sh`
+removes Waydroid, libvirt and SSH from boot and stops them without uninstalling
+packages. It is an explicit maintenance action, not part of the installer.
+Restore a needed service with `sudo dinitctl --system enable SERVICE`.
+Google Drive can be mounted on demand with
+`rclone mount gdrive: ~/Drive --vfs-cache-mode full --daemon`.
 
 ## Keyboard shortcuts
 
@@ -175,7 +213,9 @@ These are the defaults. Existing custom bindings are preserved during configurat
 
 ## Wallpaper colors and themes
 
-Waypaper selects the wallpaper; Wallust generates the palette. One hook updates Waybar, Mango borders, Rofi, Fuzzel, SwayNC, wlogout icons, Fish, Kitty, GTK3/GTK4 and supported Qt themes. Existing Vencord/Vesktop installations can receive matching QuickCSS; enable QuickCSS in the client.
+Waypaper selects the wallpaper; Wallust generates the palette. One hook updates Waybar, Mango borders, Rofi, Fuzzel, SwayNC, wlogout icons, Fish, Kitty, GTK3/GTK4, Spotifast and supported Qt themes. Existing Vencord/Vesktop installations can receive matching QuickCSS; enable QuickCSS in the client.
+
+For native Linux Spotifast, select **Victoria Wallust** under **Settings → Appearance → Theme** once. The generated regular file is `~/.config/spotifast/themes/Victoria Wallust.json`; later wallpaper changes update it automatically, including while music plays. Run `spotifast reload-themes` if it does not appear immediately. Disable **Colour from album art** to keep pages in the Wallust palette. This themes the main window; Winamp skins are separate. See the [Spotifast custom themes documentation](https://spotifast.rocks/settings-and-files/#custom-themes).
 
 The bundled configuration uses **Wallust 4.x syntax**. The theme helper detects **Wallust 3.x** and translates its rendering options without rewriting the source configuration. CI tests the real Wallust 3.5.1 renderer; local validation also covers 4.1.0-alpha.
 
@@ -183,7 +223,7 @@ GTK uses **Materia-dark-compact**. Qt applications such as Ark and qBittorrent u
 
 Some applications need reopening after a theme change. Flatpak applications, custom application themes and Libadwaita may not reproduce the host theme exactly. GTK theme settings alone do not configure Qt applications.
 
-Wallpaper restoration runs before Waybar starts. Repeated launcher calls avoid starting a second bar. Generated palettes are validated before replacing the previous working colors.
+Wallpaper restoration runs before the selected bar starts. Repeated launcher calls avoid starting a second bar. Generated palettes are validated before replacing the previous working colors.
 
 ## Update an existing installation
 
@@ -298,6 +338,6 @@ Further reading: [Desktop controls](docs/desktop-controls.md) · [Project layout
 
 ## Credits
 
-Built with [Mango](https://github.com/mangowm/mango) and the work of its contributors, alongside Waybar, Rofi/Fuzzel, SwayNC, Wallust, Waypaper, Hyprlock, PipeWire and the Wayland desktop ecosystem.
+Built with [Mango](https://github.com/mangowm/mango) and the work of its contributors, alongside Quickshell, Waybar, Rofi/Fuzzel, SwayNC, Wallust, Waypaper, Hyprlock, PipeWire and the Wayland desktop ecosystem.
 
 Bundled themes and assets include [UltraGrub](https://github.com/YouStones/ultrakill-grub-theme), [Nerd Fonts](https://www.nerdfonts.com/), [Animated Mew Cursor](https://www.gnome-look.org/c/2326996), [Materia GTK](https://github.com/nana-4/materia-theme) and [Materia KDE](https://github.com/PapirusDevelopmentTeam/materia-kde), used with [Kvantum](https://github.com/tsujan/Kvantum).

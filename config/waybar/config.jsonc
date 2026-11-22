@@ -142,7 +142,7 @@
     "format-paused": "{status_icon} {artist} - {title}",
     "on-click": "playerctl play-pause",
     "on-click-middle": "playerctl previous",
-    "on-click-right": "playerctl next",
+    "on-click-right": "python3 \"$HOME/.config/mango/scripts/media-player.py\"",
     "player-icons": {
         "default": "▶",
         "spotify": "󰓇",

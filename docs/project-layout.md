@@ -8,6 +8,7 @@ changes system services; use full installation on a fresh machine.
 | Source | Installed runtime |
 | --- | --- |
 | `config/mango/` | `~/.config/mango/` |
+| `config/quickshell/` | `~/.config/mango/quickshell/` (default bar and native popups) |
 | `config/waybar/` | `~/.config/mango/waybar/` |
 | `config/hyprlock/hyprlock.conf` | `~/.config/mango/config/hyprlock/hyprlock.conf` |
 | `config/{rofi,swaync,wlogout,wallust,...}/` | Mango templates; the installer/hooks activate app configurations |
@@ -15,6 +16,7 @@ changes system services; use full installation on a fresh machine.
 | `themes/`, `wallpapers/` | Bundled assets, deployed by the installer |
 | `installer/` | Package selection, deployment and desktop integration |
 | `tests/`, `.github/workflows/` | Isolated regression tests and CI |
+| `maintenance/` | Optional host maintenance scripts; never run by the installer |
 | `docs/` | User and maintenance documentation |
 
 Executable entry points use hyphenated names; reusable Python helpers use underscores.

@@ -224,6 +224,7 @@ def apply(image=None, install=False):
             'rofi': MANGO / 'config/rofi/colors.rasi',
             'fuzzel': MANGO / 'config/fuzzel.ini',
             'wlogout': CONFIG / 'wlogout/colors.css',
+            'spotifast': CONFIG / 'spotifast/themes/Victoria Wallust.json',
         }
         # Render into staging: an invalid/missing template must not replace the
         # working desktop palette or publish a new Fish generation.
@@ -284,7 +285,7 @@ def apply(image=None, install=False):
                                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=3)
             except (OSError, subprocess.TimeoutExpired):
                 pass
-        print(f'Wallust: Waybar, Mango, Fish, Rofi, Fuzzel and wlogout colors generated from {selected.name}')
+        print(f'Wallust: Waybar, Mango, Fish, Rofi, Fuzzel, wlogout and Spotifast colors generated from {selected.name}')
 
 
 def main():

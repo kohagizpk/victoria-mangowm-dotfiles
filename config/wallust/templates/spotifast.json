@@ -1,0 +1,22 @@
+{
+  "base": "dark",
+  "colors": {
+    "window": "{{background}}",
+    "panel": "{{background}}",
+    "surface": "{{color0}}",
+    "surface_hover": "{{color8}}",
+    "surface_active": "{{color5}}33",
+    "outline": "{{foreground}}26",
+    "text": "{{foreground}}",
+    "secondary": "{{color7}}",
+    "dim": "{{foreground}}80",
+    "accent": "{{color5}}",
+    "accent_hover": "{{color13}}",
+    "on_accent": "{{background}}",
+    "danger": "{{color1}}",
+    "warning": "{{color3}}",
+    "overlay": "{{background}}CC",
+    "shadow": "#00000066",
+    "tint": "{{color5}}18"
+  }
+}

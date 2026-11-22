@@ -37,6 +37,7 @@ class DeploymentTests(unittest.TestCase):
         (mango / 'config.conf').write_text('xkb_rules_layout=br\nxkb_rules_variant=\n')
         (mango / 'monitor.conf').write_text('monitorrule=DP-9,1920x1080@60,0.0,1\n')
         (mango / 'apps.conf').write_text('START_BROWSER=1\n')
+        (mango / 'env.conf').write_text('env=LANG,pt_BR.UTF-8\nenv=LC_ALL,pt_BR.UTF-8\nenv=LANGUAGE,pt_BR\nenv=PERSONAL_SETTING,keep\n')
         (mango / 'bind.conf').write_text('# personal bindings\n')
         (mango / 'autostart.sh').write_text('#!/bin/sh\n# Preferências pessoais preservadas na atualização.\nexample-personal-command &\n# Show guided setup\npython3 victoria-controls.py --first-run &\n')
         (mango / 'rule.conf').write_text('# personal rules\n')
@@ -45,6 +46,11 @@ class DeploymentTests(unittest.TestCase):
         for _ in range(2):
             result = self.run_install('--config-only')
             self.assertEqual(result.returncode, 0, result.stderr)
+            environment = (mango / 'env.conf').read_text()
+            self.assertIn('env=PERSONAL_SETTING,keep', environment)
+            self.assertNotIn('pt_BR', environment)
+            for name, value in [('LANG', 'C.UTF-8'), ('LC_ALL', 'C.UTF-8'), ('LANGUAGE', 'en'), ('LC_MESSAGES', 'C.UTF-8'), ('LC_TIME', 'C.UTF-8')]:
+                self.assertEqual(environment.count(f'env={name},{value}'), 1)
             self.assertIn('xkb_rules_layout=br', (mango / 'local/input.conf').read_text())
             self.assertIn('DP-9', (mango / 'local/monitor.conf').read_text())
             self.assertEqual((mango / 'apps.conf').read_text(), 'START_BROWSER=1\n')

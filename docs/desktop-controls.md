@@ -2,11 +2,12 @@
 
 | Entry point | Function |
 | --- | --- |
-| Gear before the Waybar microphone / Super+, | Victoria Settings |
+| Gear before the microphone / Super+, | Victoria Settings |
 | Sliders beside the power button / Super+C | Control center |
 | Right-click microphone | Select microphone and adjust input volume |
 | Right-click speaker/headphones | Select output, master volume and application volumes |
-| Right-click clock | Calendar, notifications, DND and visual performance |
+| Right-click clock | Calendar, DND and visual performance; Waybar also shows SwayNC notifications |
+| Right-click music | MPRIS player with rotating record, playback controls and player selection |
 | Super+V | Clipboard history: search, thumbnails, scrolling and older copies |
 | Super+Shift+S | Capture a region to the clipboard |
 | Super+L | Lock with Hyprlock |
@@ -35,8 +36,11 @@ nmcli through stdin, never command-line arguments. Enterprise networks may need
 NetworkManager configuration. No VPN, lock, settings or visual-performance duplicate
 buttons are included in this menu.
 
-The audio panels open at the clicked bar icon using Gtk4LayerShell. Both have **Close**
-and Escape. Device selection moves active audio streams where supported.
+Quickshell is the default bar, with native QML audio, media and calendar panels.
+Waybar remains available through `bash ~/.config/mango/scripts/bar-switch.sh waybar`;
+use `quickshell` as the argument to switch back. Both backends read the Wallust palette.
+Panels open near the clicked icon and close with X or Escape. Device selection moves
+active audio streams where supported. Waybar uses the GTK4 audio and media panels.
 
 ## Clipboard
 
@@ -74,7 +78,7 @@ MateriaDark. Original package files are never edited; author/license files are r
 GTK and Qt keep dark surfaces and readable text. Some applications need reopening;
 Flatpak and applications with their own styles may require separate setup.
 
-Waybar starts once, after wallpaper/palette restoration, and detects the CPU temperature
+The selected bar starts once, after wallpaper/palette restoration, and detects the CPU temperature
 sensor by identity. Startup services run without fixed sleeps or unnecessary portal
 restarts. Put extra startup commands in `~/.config/mango/local/autostart.sh`.
 

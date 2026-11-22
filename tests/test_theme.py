@@ -88,6 +88,14 @@ for template in config['templates'].values():
         self.assertIn('background=111827f2', (self.mango / 'config/fuzzel.ini').read_text())
         self.assertIn('normal-background: #111827', (self.mango / 'config/rofi/colors.rasi').read_text())
         self.assertIn('@define-color background #111827', (self.home / '.config/wlogout/colors.css').read_text())
+        theme = self.home / '.config/spotifast/themes/Victoria Wallust.json'
+        self.assertFalse(theme.is_symlink())
+        palette = json.loads(theme.read_text())
+        self.assertEqual(palette['base'], 'dark')
+        self.assertEqual(palette['colors']['window'], '#111827')
+        self.assertEqual(palette['colors']['accent'], '#558090')
+        for value in palette['colors'].values():
+            self.assertRegex(value, r'^#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?$')
 
     def test_existing_multimonitor_settings_and_custom_hook_are_preserved(self):
         dp = self.home / 'dp image.jpg'; dp.touch()
@@ -165,6 +173,8 @@ for template in config['templates'].values():
         self.run_theme('apply', str(image))
         self.assertIn('#AABBCC', (self.mango / 'waybar/colors.css').read_text())
         self.assertFalse((self.home / 'unexpected-wallust').exists())
+        palette = json.loads((self.home / '.config/spotifast/themes/Victoria Wallust.json').read_text())
+        self.assertEqual(palette['colors']['accent'], '#AABBCC')
 
     def test_actual_fish_loader_and_prompt_refresh(self):
         fish = shutil.which('fish')

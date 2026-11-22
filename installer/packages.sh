@@ -111,7 +111,7 @@ PACKAGES=(
     # waybar-git, not waybar: the native mango/workspaces + mango/window
     # modules are recent additions upstream, the stable release may not have
     # them yet
-    waybar-git rofi fuzzel wmenu
+    quickshell waybar-git rofi fuzzel wmenu
     wl-clipboard cliphist wl-clip-persist
 
     # terminal, shell
@@ -325,7 +325,7 @@ if [[ "$DISTRO_FAMILY" == "fedora" ]]; then
     # separately below (Flatpak, or a manual note) instead of guessed at.
     FEDORA_PACKAGES=(
         mangowm
-        waybar rofi fuzzel foot kitty fish fastfetch
+        quickshell waybar rofi fuzzel foot kitty fish fastfetch
         nemo pavucontrol nwg-look gtk4-layer-shell python3-pillow
         awww waypaper cava python3 python3-gobject gtk4
         NetworkManager bluez blueman pulseaudio-utils power-profiles-daemon hyprlock swaylock swayidle
@@ -482,7 +482,7 @@ if [[ "$DISTRO_FAMILY" == "nixos" ]]; then
 # 4) Packages (best-effort names; check `nix search nixpkgs <name>` for anything missing):
 { pkgs, ... }: {
   environment.systemPackages = with pkgs; [
-    waybar rofi fuzzel foot kitty fish fastfetch
+    quickshell waybar rofi fuzzel foot kitty fish fastfetch
     nemo pavucontrol nwg-look gtk4-layer-shell
     awww waypaper
     wallust cava (python3.withPackages (ps: [ ps.pygobject3 ps.pillow ]))

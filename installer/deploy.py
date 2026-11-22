@@ -17,7 +17,7 @@ HOME = Path.home()
 CONFIG = HOME / '.config'
 MANGO = CONFIG / 'mango'
 MAPPING = {
-    'config/mango': '.', 'config/hyprlock': 'config/hyprlock', 'config/swaync': 'config/swaync', 'config/waybar': 'waybar', 'scripts': 'scripts',
+    'config/quickshell': 'quickshell', 'config/mango': '.', 'config/hyprlock': 'config/hyprlock', 'config/swaync': 'config/swaync', 'config/waybar': 'waybar', 'scripts': 'scripts',
     'wallpapers': 'wallpaper', 'config/wallust': 'config/wallust',
     'config/fish': 'config/fish', 'config/rofi': 'config/rofi',
     'config/fuzzel/fuzzel.ini': 'config/fuzzel.ini', 'config/wlogout': 'config/wlogout',
@@ -93,6 +93,20 @@ def stage(target, config_only=False):
             lines = [line for line in tail.splitlines() if 'session-controls.py' not in line and 'victoria-controls.py' not in line]
             personal.write_text('#!/bin/sh\n# Personal startup commands, preserved on reinstall.\n'+'\n'.join(lines).strip()+'\n')
     configure_cursor(target)
+    configure_language(target)
+
+
+def configure_language(target):
+    """Apply the English desktop locale even when upgrading a preserved env.conf."""
+    path = target / 'env.conf'
+    text = path.read_text()
+    for name, value in (
+        ('LANG', 'C.UTF-8'), ('LC_ALL', 'C.UTF-8'), ('LANGUAGE', 'en'),
+        ('LC_MESSAGES', 'C.UTF-8'), ('LC_TIME', 'C.UTF-8'),
+    ):
+        text = re.sub(r'^\s*env\s*=\s*' + name + r'\s*,[^\n]*', '', text, flags=re.M)
+        text = text.rstrip() + f'\nenv={name},{value}\n'
+    path.write_text(text)
 
 
 def configure_cursor(target):
