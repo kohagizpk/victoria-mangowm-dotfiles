@@ -4,7 +4,7 @@ A wallpaper-colored Wayland desktop built around [Mango](https://github.com/mang
 
 Use the desktop controls for everyday changes. Keep your personal overrides separate from the files managed by the installer.
 
-https://github.com/user-attachments/assets/cb902017-0d69-4222-970d-5467773197c4
+https://github.com/user-attachments/assets/5ad00014-64fa-4ea0-8588-aad44244a558
 
 > **Screen sharing:** background blur is temporarily disabled to avoid a SceneFX capture crash. Animations and shadows remain available. See [screen-sharing compatibility](#screen-sharing-compatibility).
 
@@ -122,7 +122,7 @@ Log out of your current desktop and select **Mango** in your login manager. A ne
 | **Victoria Settings** | Appearance, profiles, Waybar modules, clock, notifications, cursor size, input preferences and lock/idle timers |
 | **Control center** | Wi-Fi, Bluetooth, audio devices, hardware power profiles, screen off and suspend |
 | **Quickshell bar** | Default bar with workspace tags, media, system tray, CPU temperature and native audio/calendar popups. Waybar remains available as a fallback. |
-| **Media player** | Right-click the Waybar song to toggle a compact horizontal player: rotating album record, previous/play/pause/next, progress and player selection. Esc closes it; colors follow Wallust live. Uses the existing GTK4 dependencies. |
+| **Media player** | Right-click the song to open a compact horizontal player with a rotating album record, playback controls, progress and player selection. Esc closes it; colors follow Wallust live. Quickshell uses QML; Waybar uses the existing GTK4 dependencies. |
 | **Audio mixers** | Right-click the speaker for output/application volumes; right-click the microphone for input selection and volume |
 | **SwayNC** | Notifications and Do Not Disturb. Right-click the Quickshell clock for the native calendar, DND and performance controls; Waybar uses the SwayNC calendar. |
 | **Clipboard history** | Search, image thumbnails, scrolling and older entries; opens near the input field when available, otherwise near the pointer |
