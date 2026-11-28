@@ -163,26 +163,23 @@ Item {
                 }
             }
 
-            Text {
+            Marquee {
                 Layout.fillWidth: true
                 Layout.topMargin: 6
                 text: view.hasPlayer && view.player.trackTitle ? view.player.trackTitle : "Nothing playing"
-                elide: Text.ElideRight
                 color: view.app.fg
                 font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 16; font.bold: true
             }
-            Text {
+            Marquee {
                 Layout.fillWidth: true
                 text: view.hasPlayer ? (view.player.trackArtist || "Unknown artist") : "Open a music player"
-                elide: Text.ElideRight
                 color: view.app.fg; opacity: 0.7
                 font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 12
             }
-            Text {
+            Marquee {
                 Layout.fillWidth: true
                 visible: text.length > 0
                 text: view.hasPlayer ? view.player.trackAlbum : ""
-                elide: Text.ElideRight
                 color: view.app.fg; opacity: 0.4
                 font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 10
             }

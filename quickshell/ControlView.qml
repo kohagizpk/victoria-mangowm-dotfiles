@@ -363,8 +363,8 @@ Item {
                     ColumnLayout {
                         Layout.fillWidth: true
                         spacing: 0
-                        Label { text: view.player ? view.player.trackTitle || view.player.identity : ""; font.bold: true; Layout.fillWidth: true }
-                        Label { text: view.player ? view.player.trackArtist : ""; opacity: 0.55; font.pixelSize: 10; Layout.fillWidth: true }
+                        Marquee { text: view.player ? view.player.trackTitle || view.player.identity : ""; color: view.app.fg; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 12; font.bold: true; Layout.fillWidth: true }
+                        Marquee { text: view.player ? view.player.trackArtist : ""; color: view.app.fg; opacity: 0.55; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 10; Layout.fillWidth: true }
                     }
                     Chip { text: "󰒮"; surface: view.app.bg; ink: view.app.fg; accent: view.app.accent; onClicked: view.player.previous() }
                     Chip { text: view.player && view.player.isPlaying ? "󰏤" : "󰐊"; selected: true; surface: view.app.bg; ink: view.app.fg; accent: view.app.accent; onClicked: view.player.togglePlaying() }

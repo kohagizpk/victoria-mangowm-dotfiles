@@ -216,7 +216,6 @@ ShellRoot {
                         BarChip { required property var modelData; text:String(modelData.index); selected:modelData.is_active; ink:modelData.is_urgent?"#ff8080":modelData.client_count>0?root.fg:Qt.alpha(root.fg,0.4)
                             onClicked: button=>root.workspace(bar.screen.name,modelData.index,button===Qt.RightButton) }
                     }
-                    BarChip { text:""; tip:"Victoria Settings · right-click for Setup"; onClicked:button=>root.settingsPage!==""?root.settingsPage="":root.openSettings(button===Qt.RightButton?"setup":"appearance") }
                     BarChip { text:root.audioMuted(true)?"󰍭 Off":"󰍬 "+root.audioLabel(true); tip:root.source?root.source.description:""; onClicked:button=>button===Qt.RightButton?openPopup("mic"):root.mute(true); onScrolled:delta=>root.volume(true,delta) }
                     BarChip { id:audioButton; text:(root.audioMuted(false)?"󰝟 ":"󰕾 ")+root.audioLabel(false); tip:root.sink?root.sink.description:""; onClicked:button=>button===Qt.RightButton?openPopup("audio"):root.mute(false); onScrolled:delta=>root.volume(false,delta) }
                     BarChip { visible:root.stats; text:"󰍛 "+(root.data.cpu||0)+"%" }

@@ -1,7 +1,7 @@
 import QtQuick
 import QtQuick.Layouts
 
-// Month calendar plus Do-not-disturb / Performance toggles.
+// Month calendar (weather on top when enabled). DND and performance live in the Control Center.
 Item {
     id: view
     required property var app
@@ -84,24 +84,5 @@ Item {
         }
 
         Button { text: "Today"; Layout.alignment: Qt.AlignHCenter; visible: !view.currentMonth; onClicked: view.month = new Date(view.app.now.getFullYear(), view.app.now.getMonth(), 1) }
-        Rectangle { Layout.fillWidth: true; implicitHeight: 1; color: Qt.alpha(view.app.fg, 0.1) }
-        RowLayout {
-            Layout.fillWidth: true
-            spacing: 8
-            Button {
-                text: "󰂛 Do not disturb"; Layout.fillWidth: true
-                selected: view.app.dnd
-                enabled: view.app.dndAvailable
-                opacity: enabled ? 1 : 0.4
-                tip: enabled ? (selected ? "Enabled · click to disable" : "Mute notifications") : "Notification service unavailable"
-                onClicked: view.app.setDnd(!view.app.dnd)
-            }
-            Button {
-                text: "󱐋 Performance"; Layout.fillWidth: true
-                selected: view.app.performance
-                tip: selected ? "Enabled · restore visual effects" : "Disable Mango visual effects"
-                onClicked: view.app.script("session-controls.py", ["performance"])
-            }
-        }
     }
 }
