@@ -20,6 +20,7 @@ done
 if [[ "$1" == quickshell ]]; then
     pkill -x swaync 2>/dev/null || true
     pkill -x dunst 2>/dev/null || true
+    pkill -x mako 2>/dev/null || true
     pkill -x swayosd-server 2>/dev/null || true
     QT_QUICK_CONTROLS_STYLE=Basic QT_QUICK_BACKEND=software quickshell --no-duplicate -p "$root/quickshell" -d --no-color
 else

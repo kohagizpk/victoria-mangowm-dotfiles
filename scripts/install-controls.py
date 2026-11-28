@@ -78,6 +78,12 @@ def install():
     if p.exists() and 'idle-restart' not in p.read_text():
         atomic(p, p.read_text() + '\npython3 "$HOME/.config/mango/scripts/session-controls.py" idle-restart &\n')
 
+    # Own the notification D-Bus activation so mako/dunst/swaync can't grab the name
+    # before the Quickshell bar registers (see scripts/notification-daemon.sh).
+    atomic(HOME / '.local/share/dbus-1/services/org.freedesktop.Notifications.service',
+           '[D-BUS Service]\nName=org.freedesktop.Notifications\nExec=/usr/bin/env bash '
+           + str(MANGO / 'scripts/notification-daemon.sh') + '\n')
+
     for directory in (MANGO / 'config/wlogout', HOME / '.config/wlogout'):
         layout = directory / 'layout'
         if layout.exists():
