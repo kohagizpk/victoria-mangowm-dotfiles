@@ -9,8 +9,10 @@ if [[ "$choice" == waybar ]] || ! command -v quickshell >/dev/null; then
     pgrep -x swayosd-server >/dev/null || swayosd-server >/dev/null 2>&1 &
     exec bash "$root/scripts/waybar-launch.sh"
 fi
-# Quickshell serves notifications and the OSD; free the D-Bus name for it.
+# Quickshell serves notifications and the OSD; free the D-Bus name for it
+# (dunst/swaync can be D-Bus activated while the bar restarts).
 pkill -x swaync 2>/dev/null || true
+pkill -x dunst 2>/dev/null || true
 pkill -x swayosd-server 2>/dev/null || true
 export QT_QUICK_CONTROLS_STYLE=Basic
 # Software scene graph: ~100 MB less RAM than OpenGL for a mostly static bar.
