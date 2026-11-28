@@ -37,15 +37,15 @@ pgrep -x pipewire-pulse >/dev/null || pipewire-pulse &
 # ---------- Script pessoal (opcional) ----------
 [ -f "$HOME/.local/bin/fix-volume.sh" ] && bash "$HOME/.local/bin/fix-volume.sh" &
 
-# ---------- Wallpaper (awww + waypaper; o wallust roda via post_command) ----------
+# ---------- Wallpaper (awww restaura o último; wallust gera as cores) ----------
 (
     bash "$HOME/.config/mango/scripts/wallpaper-start.sh"
     bash "$HOME/.config/mango/scripts/bar-launch.sh"
 ) &
 
 # ---------- Barra, notificações e OSD ----------
-swaync &
-swayosd-server &
+# Notifications and the volume OSD come from the bar: Quickshell draws its own;
+# bar-launch.sh starts swaync + swayosd only for Waybar.
 
 # ---------- Clipboard ----------
 wl-clip-persist --clipboard regular --reconnect-tries 0 >/dev/null 2>&1 &

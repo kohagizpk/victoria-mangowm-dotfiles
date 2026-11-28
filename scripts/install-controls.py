@@ -12,20 +12,33 @@ def install():
     custom = MANGO / 'local/custom.conf'
     if custom.exists():
         atomic(custom, re.sub(r'(?m)^(\s*blur(?:_layer)?\s*=\s*)[^#\n]+', r'\g<1>0', custom.read_text()))
-    script = str(MANGO / 'scripts/victoria-controls.py')
+    script = str(MANGO / 'scripts/victoria-open.sh')
     # Desktop Exec quoting is not shell quoting.
     quoted = '"' + script.replace('\\', '\\\\').replace('"', '\\"').replace('`', '\\`').replace('$', '\\$') + '"'
-    for suffix, name, arg in [('', 'Victoria Settings', ''), ('-shortcuts', 'Victoria Shortcuts', ' --shortcuts')]:
+    for suffix, name, arg in [('', 'Victoria Settings', ' settings'), ('-shortcuts', 'Victoria Shortcuts', ' shortcuts')]:
         atomic(HOME / f'.local/share/applications/victoria{suffix}.desktop',
                '[Desktop Entry]\nType=Application\nName=' + name + '\nComment=Personalize your Victoria desktop\n'
-               'Exec=python3 ' + quoted + arg + '\nIcon=preferences-desktop\nTerminal=false\nCategories=Settings;DesktopSettings;\n')
+               'Exec=' + quoted + arg + '\nIcon=preferences-desktop\nTerminal=false\nCategories=Settings;DesktopSettings;\n')
     p = MANGO / 'bind.conf'
     if p.exists():
         text = p.read_text()
-        text = re.sub(r'^bind=SUPER,v,spawn_shell,cliphist list[^\n]*$', 'bind=SUPER,v,spawn,python3 ~/.config/mango/scripts/clipboard-picker.py', text, flags=re.M)
-        for modifiers, key, arg in [('SUPER', 'slash', '--shortcuts'), ('SUPER', 'comma', ''), ('SUPER+SHIFT', 'f', '--focus')]:
+        # Older managed bindings move to the Quickshell panels (victoria-open.sh falls
+        # back to the GTK/Rofi tools when the bar is Waybar). Personal bindings stay.
+        opener = '~/.config/mango/scripts/victoria-open.sh'
+        for old, new in [
+            (r'^bind=SUPER,v,spawn_shell,cliphist list[^\n]*$', f'bind=SUPER,v,spawn,{opener} clipboard'),
+            (r'^bind=SUPER,v,spawn,python3 ~/\.config/mango/scripts/clipboard-picker\.py\s*$', f'bind=SUPER,v,spawn,{opener} clipboard'),
+            (r'^bind=SUPER,d,spawn,rofi -show drun -theme ~/\.config/mango/config/rofi/theme\.rasi\s*$', f'bind=SUPER,d,spawn,{opener} launcher'),
+            (r'^bind=SUPER,f,spawn,waypaper\s*$', 'bind=SUPER,f,spawn,~/.config/mango/scripts/wallpaper-picker.sh'),
+            (r'^bind=SUPER,slash,spawn,python3 ~/\.config/mango/scripts/victoria-controls\.py --shortcuts\s*$', f'bind=SUPER,slash,spawn,{opener} shortcuts'),
+            (r'^bind=SUPER,comma,spawn,python3 ~/\.config/mango/scripts/victoria-controls\.py\s*$', f'bind=SUPER,comma,spawn,{opener} settings'),
+            (r'^bind=SUPER,c,spawn,python3 ~/\.config/mango/scripts/control-center\.py\s*$', f'bind=SUPER,c,spawn,{opener} control'),
+        ]:
+            text = re.sub(old, new, text, flags=re.M)
+        for modifiers, key, command in [('SUPER', 'slash', f'{opener} shortcuts'), ('SUPER', 'comma', f'{opener} settings'),
+                                        ('SUPER+SHIFT', 'f', 'python3 ~/.config/mango/scripts/victoria-controls.py --focus')]:
             if not re.search(r'^bind\s*=\s*' + re.escape(modifiers) + r'\s*,\s*' + key + r'\s*,', text, re.M):
-                text += f'\nbind={modifiers},{key},spawn,python3 ~/.config/mango/scripts/victoria-controls.py {arg}\n'
+                text += f'\nbind={modifiers},{key},spawn,{command}\n'
         atomic(p, text)
     p = MANGO / 'rule.conf'
     if p.exists():
@@ -44,9 +57,11 @@ def install():
     atomic(p,text)
     p = MANGO / 'bind.conf'
     text = p.read_text()
-    for modifiers, key, script_name, action in [('SUPER','c','control-center.py',''), ('SUPER','l','session-controls.py','lock'), ('SUPER+SHIFT','p','session-controls.py','performance')]:
+    for modifiers, key, command in [('SUPER','c','~/.config/mango/scripts/victoria-open.sh control'),
+                                    ('SUPER','l','python3 ~/.config/mango/scripts/session-controls.py lock'),
+                                    ('SUPER+SHIFT','p','python3 ~/.config/mango/scripts/session-controls.py performance')]:
         if not re.search(r'^bind\s*=\s*' + re.escape(modifiers) + r'\s*,\s*' + key + r'\s*,', text, re.M):
-            text += f'\nbind={modifiers},{key},spawn,python3 ~/.config/mango/scripts/{script_name} {action}\n'
+            text += f'\nbind={modifiers},{key},spawn,{command}\n'
     atomic(p,text)
     import importlib.util
     spec=importlib.util.spec_from_file_location('session_controls', MANGO/'scripts/session-controls.py')

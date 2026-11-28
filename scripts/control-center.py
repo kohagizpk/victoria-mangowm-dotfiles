@@ -144,4 +144,10 @@ def main():
             choose('Could not complete',[(str(exc),None)])
 
 
-if __name__=='__main__':main()
+if __name__=='__main__':
+    # Prefer the Quickshell control center; this Rofi menu stays as the Waybar fallback.
+    if '--gtk' not in sys.argv and shutil.which('quickshell') and subprocess.run(
+            ['quickshell','ipc','-p',str(HOME/'.config/mango/quickshell'),'call','bar','controlCenter'],
+            capture_output=True,timeout=5).returncode==0:
+        sys.exit(0)
+    main()

@@ -4,7 +4,6 @@ import argparse
 import json
 import os
 import re
-from pathlib import Path
 import sys
 import threading
 
@@ -232,7 +231,7 @@ button.suggested-action { background-image: none; box-shadow: none; border: 1px 
         def open_wallpaper(self):
             import subprocess
             try:
-                subprocess.Popen(['waypaper'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+                subprocess.Popen(['bash', str(backend.MANGO / 'scripts/wallpaper-picker.sh')], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
             except OSError as exc:
                 self.status.set_text(str(exc))
 
@@ -406,6 +405,22 @@ button.suggested-action { background-image: none; box-shadow: none; border: 1px 
     return app.run([sys.argv[0], page])
 
 
+def quickshell_open(page, wait=0):
+    """Show the page in the Quickshell settings panel; False when that bar is not running."""
+    import shutil, subprocess, time
+    if not shutil.which('quickshell'):
+        return False
+    deadline = time.monotonic() + wait
+    while True:
+        result = subprocess.run(['quickshell', 'ipc', '-p', str(backend.MANGO / 'quickshell'), 'call', 'bar', 'settings', page],
+                                capture_output=True, timeout=5)
+        if result.returncode == 0:
+            return True
+        if time.monotonic() >= deadline:
+            return False
+        time.sleep(1)
+
+
 def main():
     parser=argparse.ArgumentParser()
     parser.add_argument('--shortcuts',action='store_true')
@@ -413,15 +428,19 @@ def main():
     parser.add_argument('--diagnostics',action='store_true')
     parser.add_argument('--focus',action='store_true')
     parser.add_argument('--first-run',action='store_true')
+    parser.add_argument('--gtk',action='store_true',help='use the GTK window even when the Quickshell bar is running')
     args=parser.parse_args()
     if args.focus:
         print('Focus on' if backend.focus() else 'Focus off');return
     if args.first_run:
         if (backend.STATE / 'focus.json').exists():
-            backend.command(['swaync-client', '-sw', '-dn'], required=False)
+            try: backend.dnd_set(True)
+            except Exception: pass
         if (backend.STATE/'settings-autostart-disabled').exists():return
         if (backend.STATE/'setup-complete').exists() and not (backend.STATE/'settings-autostart-enabled').exists():return
     page='setup' if args.setup or args.first_run else 'shortcuts' if args.shortcuts else 'diagnostics' if args.diagnostics else 'appearance'
+    # The bar may still be starting at login, so give the first run a few seconds.
+    if not args.gtk and quickshell_open(page, wait=15 if args.first_run else 0):return
     launch(page,args.first_run)
 
 if __name__=='__main__':

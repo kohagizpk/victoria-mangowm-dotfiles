@@ -59,17 +59,30 @@ class SettingsTests(unittest.TestCase):
         self.assertEqual(len(rows), 2)
         self.assertTrue(any('panel.py' in row[1] for row in rows))
 
-    def test_focus_restores_previous_dnd_and_preserves_base_bar(self):
+    def _focus_twice(self, quickshell):
         calls = []
         def command(args, **kwargs):
             calls.append(args)
             return subprocess.CompletedProcess(args, 0, stdout='true\n', stderr='')
-        with patch.object(settings, 'command', side_effect=command), patch.object(settings, 'refresh_bar_config'):
+        which = (lambda name: '/usr/bin/' + name) if quickshell else (lambda name: None if name == 'quickshell' else '/usr/bin/' + name)
+        with patch.object(settings, 'command', side_effect=command), patch.object(settings, 'refresh_bar_config'), \
+                patch.object(settings.shutil, 'which', side_effect=which):
             self.assertTrue(settings.focus())
             self.assertTrue(json.loads((self.state / 'focus.json').read_text())['previous_dnd'])
             self.assertFalse(settings.focus())
+        return calls
+
+    def test_focus_restores_previous_dnd_and_preserves_base_bar(self):
+        # Waybar setups: swaync owns notifications.
+        calls = self._focus_twice(quickshell=False)
         self.assertEqual(sum('-dn' in call for call in calls), 2)
         self.assertFalse(any('-df' in call for call in calls))
+
+    def test_focus_uses_quickshell_dnd_when_the_bar_is_quickshell(self):
+        calls = self._focus_twice(quickshell=True)
+        ipc = [call for call in calls if call[:2] == ['quickshell', 'ipc']]
+        self.assertEqual([call[-2:] for call in ipc if call[-2] == 'dnd'], [['dnd', 'true'], ['dnd', 'true']])
+        self.assertFalse(any('swaync-client' in call for call in calls))
 
     def test_jsonc_comments_and_focus_filter_do_not_touch_actions(self):
         text = '''{ // personal bar
@@ -157,3 +170,34 @@ class SettingsTests(unittest.TestCase):
         self.assertIn('[29]', text); self.assertIn('MON TUE', text)
 
 if __name__ == '__main__': unittest.main()
+
+
+class KeyboardTests(unittest.TestCase):
+    """Setup wizard keyboard rules: Mango rejects empty values, so they must never be written."""
+
+    def test_single_layout_without_variant_writes_no_empty_lines(self):
+        rules = settings.keyboard_rules('English (US)')
+        self.assertEqual(rules, 'xkb_rules_layout=us')
+        self.assertNotRegex(rules, r'=\s*$')
+
+    def test_second_layout_and_switch_shortcut(self):
+        rules = settings.keyboard_rules('Portuguese (Brazil, ABNT2)', 'English (US, international)', 'Super + Space')
+        self.assertEqual(rules.splitlines(), ['xkb_rules_layout=br,us', 'xkb_rules_variant=,intl', 'xkb_rules_options=grp:win_space_toggle'])
+
+    def test_old_names_and_duplicate_secondary(self):
+        self.assertEqual(settings.keyboard_rules('US international'), 'xkb_rules_layout=us\nxkb_rules_variant=intl')
+        self.assertEqual(settings.keyboard_rules('English (US)', 'English (US)'), 'xkb_rules_layout=us')
+
+    def test_unknown_layout_is_rejected(self):
+        with self.assertRaises(ValueError): settings.keyboard_rules('Klingon')
+        with self.assertRaises(ValueError): settings.keyboard_rules('English (US)', 'None', 'Shift + F12')
+
+    def test_every_offered_layout_is_a_real_xkb_layout(self):
+        rules = Path('/usr/share/X11/xkb/rules/evdev.lst')
+        if not rules.is_file():
+            self.skipTest('xkeyboard-config is not installed')
+        text = rules.read_text()
+        for name, (layout, variant) in settings.KEYBOARDS.items():
+            pattern = rf'^\s+{variant}\s+{layout}:' if variant else rf'^\s+{layout}\s'
+            with self.subTest(name=name):
+                self.assertRegex(text, '(?m)' + pattern)

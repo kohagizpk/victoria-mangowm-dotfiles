@@ -79,12 +79,34 @@ def hyprlock_config():
         background=str(link)
     except (OSError,RuntimeError):pass
     template=template.replace('@WALLPAPER@',background)
+    face=HOME/'.face'
+    if face.is_file():
+        # Round profile picture above the clock (set in Victoria Settings → Profile).
+        template+=('\nimage {\n    monitor =\n    path = '+str(face)+'\n    size = 120\n    rounding = -1\n'
+                   '    border_size = 3\n    border_color = rgb('+color('color5','b18aa6')+')\n'
+                   '    position = 0, 310\n    halign = center\n    valign = center\n}\n')
     target=RUNTIME/'hyprlock.conf';atomic(target,template)
     return target
 
 
+def quickshell_lock():
+    """Lock with the Quickshell bar's lock screen; True once the compositor confirms it."""
+    if not shutil.which('quickshell'):return False
+    ipc=['quickshell','ipc','-p',str(MANGO/'quickshell'),'call','bar']
+    try:
+        if subprocess.run(ipc+['lock'],capture_output=True,timeout=5).returncode:return False
+        for _ in range(100):
+            state=subprocess.run(ipc+['lockStatus'],capture_output=True,text=True,timeout=5).stdout.strip()
+            if state=='locked':return True
+            time.sleep(0.05)
+    except (OSError,subprocess.TimeoutExpired):return False
+    raise RuntimeError('Lock was not confirmed; screens and suspend were left unchanged.')
+
+
 def lock_screen():
     RUNTIME.mkdir(parents=True,exist_ok=True)
+    # Prefer the Quickshell lock screen; hyprlock/swaylock remain the fallback (Waybar setups).
+    if quickshell_lock():return
     with (RUNTIME/'locking.lock').open('w') as guard:
         fcntl.flock(guard,fcntl.LOCK_EX)
         state=RUNTIME/'hyprlock.json'
@@ -141,11 +163,17 @@ def screen_off_ready():
             except BlockingIOError:
                 if not (RUNTIME/'screen-resumed').exists():
                     set_screens(False,json.loads((RUNTIME/'screens.json').read_text()))
+                    # Tells the watcher the screens are off: from now on only activity wakes them.
+                    (RUNTIME/'screens-off').touch()
             else:raise RuntimeError('No wake watcher; refusing to turn screens off.')
 
 
 def screen_watch():
-    """One-shot idle watcher, established before DPMS off, plus a recovery timer."""
+    """One-shot idle watcher, established before DPMS off.
+
+    The 60 s timer only covers arming: if the screens were never powered down
+    (the user stayed active), the watcher gives up. Once they are off, it waits
+    for real activity (swayidle resume) instead of waking them on a timer."""
     RUNTIME.mkdir(parents=True,exist_ok=True)
     with (RUNTIME/'screen-watch.lock').open('w') as guard:
         try:fcntl.flock(guard,fcntl.LOCK_EX|fcntl.LOCK_NB)
@@ -154,12 +182,15 @@ def screen_watch():
         if not names:raise RuntimeError('No monitors found; screens were not powered down.')
         atomic(RUNTIME/'screens.json',json.dumps(names))
         resumed=RUNTIME/'screen-resumed';resumed.unlink(missing_ok=True)
+        powered_off=RUNTIME/'screens-off';powered_off.unlink(missing_ok=True)
         action=lambda name:shlex.join([sys.executable,str(ROOT/'session-controls.py'),name])
         # Power down from swayidle's callback: its resume listener is already armed.
         child=subprocess.Popen(['swayidle','-w','timeout','1',action('screen-off-ready'),'resume',action('screen-on')])
         try:
             deadline=time.monotonic()+60
-            while child.poll() is None and time.monotonic()<deadline and not resumed.exists():time.sleep(0.1)
+            while child.poll() is None and not resumed.exists():
+                if not powered_off.exists() and time.monotonic()>=deadline:break
+                time.sleep(0.1)
         finally:
             # Cancel callbacks before waking, including callbacks already in flight.
             (RUNTIME/'screen-resumed').touch()
@@ -171,6 +202,7 @@ def screen_watch():
                 fcntl.flock(power,fcntl.LOCK_EX)
                 set_screens(True,names)
             (RUNTIME/'screens.json').unlink(missing_ok=True)
+            powered_off.unlink(missing_ok=True)
 
 
 def screens(on):

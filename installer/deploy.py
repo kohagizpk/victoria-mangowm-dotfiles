@@ -17,7 +17,7 @@ HOME = Path.home()
 CONFIG = HOME / '.config'
 MANGO = CONFIG / 'mango'
 MAPPING = {
-    'config/quickshell': 'quickshell', 'config/mango': '.', 'config/hyprlock': 'config/hyprlock', 'config/swaync': 'config/swaync', 'config/waybar': 'waybar', 'scripts': 'scripts',
+    'config/quickshell': 'quickshell', 'config/hyprquickpaper': 'hyprquickpaper', 'config/mango': '.', 'config/hyprlock': 'config/hyprlock', 'config/swaync': 'config/swaync', 'config/waybar': 'waybar', 'scripts': 'scripts',
     'wallpapers': 'wallpaper', 'config/wallust': 'config/wallust',
     'config/fish': 'config/fish', 'config/rofi': 'config/rofi',
     'config/fuzzel/fuzzel.ini': 'config/fuzzel.ini', 'config/wlogout': 'config/wlogout',

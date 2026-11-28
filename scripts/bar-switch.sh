@@ -18,8 +18,12 @@ for _ in {1..20}; do
     sleep 0.1
 done
 if [[ "$1" == quickshell ]]; then
-    QT_QUICK_CONTROLS_STYLE=Basic quickshell --no-duplicate -p "$root/quickshell" -d --no-color
+    pkill -x swaync 2>/dev/null || true
+    pkill -x swayosd-server 2>/dev/null || true
+    QT_QUICK_CONTROLS_STYLE=Basic QT_QUICK_BACKEND=software quickshell --no-duplicate -p "$root/quickshell" -d --no-color
 else
+    pgrep -x swaync >/dev/null || (GSK_RENDERER=cairo setsid -f swaync >/dev/null 2>&1)
+    pgrep -x swayosd-server >/dev/null || (setsid -f swayosd-server >/dev/null 2>&1)
     python3 - <<'PYLAUNCH'
 from pathlib import Path
 import subprocess

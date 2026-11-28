@@ -1,4 +1,3 @@
 #!/bin/sh
-# Print de uma região da tela direto para o clipboard (grim + slurp).
-region="$(slurp)" || exit 0
-grim -g "$region" - | wl-copy --type image/png
+# Super + Shift + S: region screenshot (saved and copied). See screenshot.sh for other modes.
+exec "$HOME/.config/mango/scripts/screenshot.sh" region

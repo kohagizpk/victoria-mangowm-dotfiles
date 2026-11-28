@@ -1,2 +1,10 @@
 __pycache__/
 *.py[cod]
+
+# Per-machine state never belongs in the repo (it lives in ~/.config/mango/local)
+local/
+
+# Editor and OS clutter
+*.swp
+*~
+.DS_Store

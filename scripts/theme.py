@@ -21,6 +21,10 @@ CONFIG = HOME / '.config'
 MANGO = CONFIG / 'mango'
 CACHE = Path(os.environ.get('XDG_CACHE_HOME') or HOME / '.cache') / 'wallust'
 LAST_WALLPAPER = Path(os.environ.get('XDG_STATE_HOME') or HOME / '.local/state') / 'victoria/last-wallpaper'
+# The user's wallpaper folder; hyprquickpaper browses it (hyprquickpaper/config.json).
+WALLPAPERS = HOME / 'Pictures/Wallpapers'
+PICKER_CONFIG = MANGO / 'hyprquickpaper/config.json'
+IMAGE_SUFFIXES = {'.jpg', '.jpeg', '.png', '.webp'}
 
 
 def wallust_render_config(config):
@@ -66,7 +70,36 @@ def expand_image(value):
     return path if path.is_file() else None
 
 
+def ensure_wallpaper_folder():
+    """Create ~/Pictures/Wallpapers and seed it with the bundled wallpapers once."""
+    WALLPAPERS.mkdir(parents=True, exist_ok=True)
+    if not any(p.suffix.lower() in IMAGE_SUFFIXES for p in WALLPAPERS.iterdir()):
+        for image in sorted((MANGO / 'wallpaper').glob('*')):
+            if image.suffix.lower() in IMAGE_SUFFIXES:
+                shutil.copy2(image, WALLPAPERS / image.name)
+    return WALLPAPERS
+
+
 def saved_wallpaper():
+    """Last applied wallpaper, then an older Waypaper choice, then ~/Pictures/Wallpapers,
+    then the bundled wallpapers."""
+    if LAST_WALLPAPER.is_file() and (path := expand_image(LAST_WALLPAPER.read_text())):
+        return path
+    if path := waypaper_wallpaper():
+        return path
+    folders = (WALLPAPERS, MANGO / 'wallpaper')
+    fallback = MANGO / 'wallpaper/wallpaper.jpg'
+    for folder in folders:
+        images = [p for p in sorted(folder.glob('*')) if p.is_file() and p.suffix.lower() in IMAGE_SUFFIXES] if folder.is_dir() else []
+        if folder != WALLPAPERS and fallback in images:
+            return fallback
+        if images:
+            return images[0]
+    raise RuntimeError('No readable wallpaper in ~/Pictures/Wallpapers, Waypaper or the bundled wallpaper directory.')
+
+
+def waypaper_wallpaper():
+    """Selection saved by Waypaper (used before hyprquickpaper), preferring the color monitor."""
     ini = read_ini(CONFIG / 'waypaper/config.ini')
     settings = ini['Settings']
     if settings.getboolean('use_xdg_state', fallback=False):
@@ -81,13 +114,7 @@ def saved_wallpaper():
     for image in images:
         if path := expand_image(image):
             return path
-    fallback = MANGO / 'wallpaper/wallpaper.jpg'
-    if fallback.is_file():
-        return fallback
-    for path in sorted((MANGO / 'wallpaper').glob('*')):
-        if path.is_file() and path.suffix.lower() in {'.jpg', '.jpeg', '.png', '.webp'}:
-            return path
-    raise RuntimeError('No readable wallpaper in Waypaper or the bundled wallpaper directory.')
+    return None
 
 
 def active_wallpaper():
@@ -128,6 +155,7 @@ def setup():
     config = (source / 'wallust.toml').read_text()
     config = config.replace("'~/.cache/wallust/victoria-palette.json'", json.dumps(str(CACHE / 'victoria-palette.json')))
     atomic_write(target / 'wallust.toml', config)
+    ensure_wallpaper_folder()
     fish = CONFIG / 'fish/conf.d/victoria-wallust.fish'
     atomic_write(fish, (MANGO / 'config/fish/conf.d/victoria-wallust.fish').read_text())
     # Select before rewriting Waypaper, so multi-monitor choices are preserved.
@@ -197,6 +225,25 @@ def terminal_colors():
     atomic_write(CACHE / 'victoria-colors.fish', fish)
     # Publish last: open Fish sessions load the complete generation at next prompt.
     atomic_write(CACHE / 'victoria-generation', str(time.time_ns()) + '\n')
+
+
+def picker_accent(colors):
+    """Tint hyprquickpaper's selection border with the same accent the bar uses."""
+    if not PICKER_CONFIG.is_file():
+        return
+    import colorsys
+    r, g, b = (int(colors['color5'][i:i + 2], 16) / 255 for i in (1, 3, 5))
+    h, s, v = colorsys.rgb_to_hsv(r, g, b)
+    # Same as Qt.lighter(color5, 1.6) in quickshell/shell.qml.
+    r, g, b = colorsys.hsv_to_rgb(h, s if v * 1.6 <= 1 else s / (v * 1.6), min(1, v * 1.6))
+    accent = '#%02X%02X%02X' % tuple(round(c * 255) for c in (r, g, b))
+    try:
+        config = json.loads(PICKER_CONFIG.read_text())
+    except ValueError:
+        return
+    if config.get('border_color') != accent:
+        config['border_color'] = accent
+        atomic_write(PICKER_CONFIG, json.dumps(config, indent=2) + '\n')
 
 
 def apply(image=None, install=False):
@@ -274,6 +321,7 @@ def apply(image=None, install=False):
         from theme_extras import apply as apply_extras
         apply_extras(colors)
         atomic_write(LAST_WALLPAPER, str(selected.resolve()) + '\n')
+        picker_accent(colors)
         if not install and os.environ.get('WAYLAND_DISPLAY'):
             # Mango watches colors.conf; only refresh an already-running Waybar.
             if shutil.which('pkill'):

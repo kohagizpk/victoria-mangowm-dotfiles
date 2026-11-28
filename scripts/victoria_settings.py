@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 """Victoria desktop controls. Standard-library backend, independent of GTK."""
-import calendar
 import configparser
 import io
 import fcntl
@@ -22,12 +21,35 @@ DEFAULTS = dict(font_size=12, gaps=8, border=2, radius=12, opacity=0.96,
                 natural_scroll=False, tap_to_click=True, bar_margin=0,
                 show_stats=True, show_media=True, show_visualizer=True, show_tray=True,
                 clock_seconds=True, clock_24h=True, notification_position='top-right',
-                notification_timeout=8, notification_width=400, notification_images=True, idle_enabled=False, idle_lock_minutes=10, idle_screen_minutes=15, idle_suspend_minutes=0)
+                notification_timeout=8, notification_width=400, notification_images=True, idle_enabled=False, idle_lock_minutes=10, idle_screen_minutes=15, idle_suspend_minutes=0,
+                repeat_rate=25, repeat_delay=600)
 PROFILES = {
     'Minimal': dict(font_size=12, gaps=4, border=1, radius=6, opacity=1.0, animations=False, blur=False),
     'Comfort': dict(font_size=14, gaps=10, border=2, radius=12, opacity=0.98, animations=True, blur=False),
     'Effects': dict(font_size=12, gaps=8, border=2, radius=16, opacity=0.94, animations=True, blur=False),
 }
+# Display name -> (xkb layout, xkb variant). Every pair is checked against evdev.lst.
+KEYBOARDS = {
+    'English (US)': ('us', ''), 'English (US, international)': ('us', 'intl'),
+    'English (US, AltGr international)': ('us', 'altgr-intl'), 'English (UK)': ('gb', ''),
+    'English (Dvorak)': ('us', 'dvorak'), 'English (Colemak)': ('us', 'colemak'),
+    'English (Colemak-DH)': ('us', 'colemak_dh'),
+    'Portuguese (Brazil, ABNT2)': ('br', ''), 'Portuguese (Brazil, ThinkPad)': ('br', 'thinkpad'),
+    'Portuguese (Portugal)': ('pt', ''), 'Spanish (Spain)': ('es', ''), 'Spanish (Latin America)': ('latam', ''),
+    'French (AZERTY)': ('fr', ''), 'French (Canada)': ('ca', ''), 'French (Belgium)': ('be', ''),
+    'German': ('de', ''), 'German (Switzerland)': ('ch', ''), 'Italian': ('it', ''), 'Dutch': ('nl', ''),
+    'Polish': ('pl', ''), 'Czech': ('cz', ''), 'Hungarian': ('hu', ''), 'Romanian': ('ro', ''),
+    'Swedish': ('se', ''), 'Norwegian': ('no', ''), 'Danish': ('dk', ''), 'Finnish': ('fi', ''),
+    'Turkish': ('tr', ''), 'Greek': ('gr', ''), 'Russian': ('ru', ''), 'Ukrainian': ('ua', ''),
+    'Hebrew': ('il', ''), 'Arabic': ('ara', ''), 'Japanese': ('jp', ''), 'Korean': ('kr', ''),
+}
+# Names used by older versions of the setup wizard.
+KEYBOARD_ALIASES = {'US': 'English (US)', 'US international': 'English (US, international)',
+                    'Brazil ABNT2': 'Portuguese (Brazil, ABNT2)'}
+LAYOUT_SWITCH = {'Alt + Shift': 'grp:alt_shift_toggle', 'Super + Space': 'grp:win_space_toggle',
+                 'Ctrl + Shift': 'grp:ctrl_shift_toggle', 'Caps Lock': 'grp:caps_toggle'}
+TERMINALS = ('kitty', 'foot', 'alacritty', 'wezterm', 'ghostty')
+BROWSERS = ('firefox', 'helium-browser', 'brave', 'chromium', 'zen-browser', 'librewolf')
 BEGIN = '# BEGIN VICTORIA SETTINGS'
 END = '# END VICTORIA SETTINGS'
 
@@ -52,7 +74,8 @@ def read_settings():
         mapping = {'gap_inner_horizontal': 'gaps', 'border_px': 'border', 'border_radius': 'radius',
                    'unfocused_opacity': 'opacity', 'animations': 'animations', 'blur': 'blur',
                    'shadows': 'shadows', 'cursor_size': 'cursor_size', 'sloppy_focus': 'focus_follows_mouse',
-                   'trackpad_natural_scrolling': 'natural_scroll', 'tap_to_click': 'tap_to_click'}
+                   'trackpad_natural_scrolling': 'natural_scroll', 'tap_to_click': 'tap_to_click',
+                   'repeat_rate': 'repeat_rate', 'repeat_delay': 'repeat_delay'}
         for key, value in re.findall(r'^\s*(\w+)\s*=\s*([^#\n]+)', p.read_text(), re.M):
             if key in mapping:
                 try:
@@ -91,7 +114,7 @@ def read_settings():
 
 def validate_settings(data):
     result = {key: data.get(key, val) for key, val in DEFAULTS.items()}
-    for key, lo, hi in [('font_size', 10, 20), ('gaps', 0, 30), ('border', 0, 8), ('radius', 0, 30), ('cursor_size', 16, 64), ('bar_margin', 0, 16), ('notification_timeout', 3, 20), ('notification_width', 300, 600), ('idle_lock_minutes', 1, 120), ('idle_screen_minutes', 1, 180), ('idle_suspend_minutes', 0, 240)]:
+    for key, lo, hi in [('font_size', 10, 20), ('gaps', 0, 30), ('border', 0, 8), ('radius', 0, 30), ('cursor_size', 16, 64), ('bar_margin', 0, 16), ('notification_timeout', 3, 20), ('notification_width', 300, 600), ('idle_lock_minutes', 1, 120), ('idle_screen_minutes', 1, 180), ('idle_suspend_minutes', 0, 240), ('repeat_rate', 10, 80), ('repeat_delay', 150, 1000)]:
         if type(result[key]) is not int or not lo <= result[key] <= hi:
             raise ValueError(f'{key} must be between {lo} and {hi}.')
     if isinstance(result['opacity'], bool) or not isinstance(result['opacity'], (float, int)) or not 0.7 <= result['opacity'] <= 1:
@@ -181,7 +204,8 @@ def save_appearance(values):
             'blur': int(v['blur']), 'blur_layer': int(v['blur']),
             'shadows': int(v['shadows']), 'layer_shadows': int(v['shadows']),
             'cursor_theme': cursor_theme, 'cursor_size': v['cursor_size'], 'sloppy_focus': int(v['focus_follows_mouse']),
-            'trackpad_natural_scrolling': int(v['natural_scroll']), 'tap_to_click': int(v['tap_to_click'])}.items())
+            'trackpad_natural_scrolling': int(v['natural_scroll']), 'tap_to_click': int(v['tap_to_click']),
+            'repeat_rate': v['repeat_rate'], 'repeat_delay': v['repeat_delay']}.items())
         speed = {'fast': 0.75, 'normal': 1, 'relaxed': 1.4}[v['animation_speed']]
         body += '\n' + '\n'.join(f'animation_duration_{key}={round(value * speed)}' for key, value in
                                    {'move':350, 'open':280, 'tag':250, 'close':350, 'focus':100}.items())
@@ -282,7 +306,13 @@ def shortcuts():
                 if action in friendly:
                     desc = friendly[action] + (' · ' + args.split(',')[0] if args.strip(',') and action not in ('moveresize',) else '')
                 elif action.startswith('spawn'):
-                    for token, label in [('cliphist', 'Clipboard history'), ('rofi', 'App launcher'),
+                    for token, label in [('cliphist', 'Clipboard history'), ('clipboard-picker', 'Clipboard history'),
+                        ('rofi', 'App launcher'), ('victoria-open.sh settings', 'Victoria Settings'),
+                        ('victoria-open.sh control', 'Control center'), ('victoria-open.sh launcher', 'App launcher'), ('victoria-open.sh clipboard', 'Clipboard history'), ('wallpaper-picker', 'Wallpaper picker'), ('victoria-open.sh shortcuts', 'Shortcut guide'),
+                        ('control-center.py', 'Control center'), ('session-controls.py lock', 'Lock screen'),
+                        ('session-controls.py performance', 'Performance mode'), ('wallpaper-picker', 'Wallpaper picker'),
+                        ('kitty', 'Terminal'), ('foot', 'Terminal'), ('nemo', 'File manager'), ('helium', 'Browser'),
+                        ('firefox', 'Browser'), ('discord', 'Discord'), ('spotify', 'Spotify'),
                         ('--shortcuts', 'Shortcut guide'), ('--focus', 'Toggle focus mode'),
                         ('victoria-controls.py', 'Victoria Settings'), ('print.sh', 'Capture screen region'),
                         ('volume.sh', 'Volume · ' + args.split()[-1]), ('brightness.sh', 'Brightness · ' + args.split()[-1])]:
@@ -291,6 +321,28 @@ def shortcuts():
                 rows.append((combo, desc, kind))
     visit(MANGO / 'config.conf')
     return rows
+
+
+def _quickshell(*args):
+    return command(['quickshell', 'ipc', '-p', str(MANGO / 'quickshell'), 'call', 'bar', *args], timeout=5, required=False)
+
+
+def dnd_get():
+    """Do-not-disturb from whichever daemon owns notifications (Quickshell bar or swaync)."""
+    if shutil.which('quickshell'):
+        result = _quickshell('dndStatus')
+        if result.returncode == 0 and result.stdout.strip() in ('true', 'false'):
+            return result.stdout.strip() == 'true'
+    response = command(['swaync-client', '-sw', '-D'], required=False).stdout.strip().lower()
+    if response not in ('true', 'false'):
+        raise RuntimeError('Could not read notification state. Focus mode was not changed.')
+    return response == 'true'
+
+
+def dnd_set(on):
+    if shutil.which('quickshell') and _quickshell('dnd', 'true' if on else 'false').returncode == 0:
+        return
+    command(['swaync-client', '-sw', '-dn' if on else '-df'])
 
 
 def focus(enabled=None):
@@ -303,14 +355,12 @@ def focus(enabled=None):
         if enabled == active:
             return active
         if enabled:
-            response = command(['swaync-client', '-sw', '-D']).stdout.strip().lower()
-            if response not in ('true', 'false'):
-                raise RuntimeError('Could not read notification state. Focus mode was not enabled.')
-            command(['swaync-client', '-sw', '-dn'])
-            atomic(p, json.dumps({'previous_dnd': response == 'true'}))
+            previous = dnd_get()
+            dnd_set(True)
+            atomic(p, json.dumps({'previous_dnd': previous}))
         else:
             previous = json.loads(p.read_text())
-            command(['swaync-client', '-sw', '-dn' if previous['previous_dnd'] else '-df'])
+            dnd_set(previous['previous_dnd'])
             p.unlink()
         refresh_bar_config()
         command(['pkill', '-USR2', '-u', str(os.getuid()), '-x', 'waybar'], required=False)
@@ -335,9 +385,39 @@ def display_rules(scale, outputs=None):
     return '\n'.join(lines) + '\n'
 
 
-def apply_setup(keyboard, layout, scale, terminal, browser):
-    choices = {'US': ('us', ''), 'US international': ('us', 'intl'), 'Brazil ABNT2': ('br', '')}
-    if keyboard not in choices or terminal not in ('Keep current', 'kitty', 'foot') or browser not in ('Keep current', 'firefox', 'helium-browser', 'brave'):
+def current_keyboard():
+    """The effective layout: last xkb_rules_* value across config.conf then local/input.conf."""
+    found = {}
+    for p in (MANGO / 'config.conf', LOCAL / 'input.conf'):
+        if p.exists():
+            for key, value in re.findall(r'^\s*xkb_rules_(layout|variant|options)\s*=\s*(\S*)', p.read_text(), re.M):
+                found[key] = value
+    layouts = found.get('layout', 'us').split(',')
+    variants = (found.get('variant', '').split(',') + ['', ''])[:len(layouts)]
+    names = {pair: name for name, pair in KEYBOARDS.items()}
+    chosen = [names.get((l, v), f'{l} {v}'.strip()) for l, v in zip(layouts, variants)]
+    switch = next((name for name, option in LAYOUT_SWITCH.items() if option in found.get('options', '')), 'Alt + Shift')
+    return {'primary': chosen[0], 'secondary': chosen[1] if len(chosen) > 1 else 'None', 'switch': switch}
+
+
+def keyboard_rules(keyboard, secondary='None', switch='Alt + Shift'):
+    keyboard = KEYBOARD_ALIASES.get(keyboard, keyboard)
+    secondary = KEYBOARD_ALIASES.get(secondary, secondary)
+    if keyboard not in KEYBOARDS or (secondary != 'None' and secondary not in KEYBOARDS) or switch not in LAYOUT_SWITCH:
+        raise ValueError('Unsupported keyboard selection.')
+    pairs = [KEYBOARDS[keyboard]] + ([KEYBOARDS[secondary]] if secondary not in ('None', keyboard) else [])
+    lines = ['xkb_rules_layout=' + ','.join(l for l, _ in pairs)]
+    # Mango rejects empty values: write variants only when one is set ("intl," is valid).
+    if any(v for _, v in pairs):
+        lines.append('xkb_rules_variant=' + ','.join(v for _, v in pairs))
+    if len(pairs) > 1:
+        lines.append('xkb_rules_options=' + LAYOUT_SWITCH[switch])
+    return '\n'.join(lines)
+
+
+def apply_setup(keyboard, layout, scale, terminal, browser, secondary='None', switch='Alt + Shift'):
+    rules = keyboard_rules(keyboard, secondary, switch)
+    if terminal not in ('Keep current', *TERMINALS) or browser not in ('Keep current', *BROWSERS):
         raise ValueError('Unsupported setup selection.')
     for app in (terminal, browser):
         if app != 'Keep current' and not shutil.which(app):
@@ -345,9 +425,10 @@ def apply_setup(keyboard, layout, scale, terminal, browser):
     paths = [LOCAL / 'input.conf', LOCAL / 'monitor.conf', MANGO / 'bind.conf']
     before = snapshot(paths)
     try:
-        kb, variant = choices[keyboard]
         p = paths[0]
-        atomic(p, managed(p.read_text() if p.exists() else '', f'xkb_rules_layout={kb}\nxkb_rules_variant={variant}'))
+        # Drop unmanaged keyboard lines so an old variant can't leak into the new layout.
+        text = re.sub(r'^\s*xkb_rules_(layout|variant|options)\s*=.*\n?', '', p.read_text() if p.exists() else '', flags=re.M)
+        atomic(p, managed(text, rules))
         if layout == 'Automatic side by side':
             atomic(paths[1], display_rules(scale))
         elif layout != 'Keep current':
@@ -367,7 +448,7 @@ def apply_setup(keyboard, layout, scale, terminal, browser):
 
 def diagnostics():
     rows = []
-    for name in ('mango', 'waybar', 'wallust', 'swaync', 'rofi', 'kitty', 'awww', 'waypaper', 'wpctl', 'pipewire', 'wireplumber'):
+    for name in ('mango', 'quickshell', 'wallust', 'swaync', 'rofi', 'awww', 'jq', 'magick', 'qs', 'pipewire', 'wireplumber', 'cava', 'hyprlock', 'swayidle', 'wlsunset', 'grim', 'slurp'):
         rows.append((bool(shutil.which(name)), name, f'Install {name} using your distribution package manager.'))
     for name in ('config.conf', 'local/custom.conf', 'waybar/config.jsonc'):
         rows.append(((MANGO / name).is_file(), name, 'Run the dotfiles installer in config-only mode.'))
@@ -389,8 +470,130 @@ def repair(action):
     actions = {
         'Refresh colors': ['python3', str(MANGO / 'scripts/theme.py'), 'apply'],
         'Restore wallpaper': ['bash', str(MANGO / 'scripts/wallpaper-start.sh')],
-        'Reload notifications': ['swaync-client', '-sw', '-R'],
+        'Reload notifications': ['bash', '-c', 'if pgrep -x swaync >/dev/null; then swaync-client -sw -R; else echo "Notifications are handled by the Quickshell bar; nothing to reload."; fi'],
     }
     if action not in actions:
         raise ValueError('Unknown repair action.')
     return command(actions[action], timeout=60).stdout
+
+# ---------- Profile picture ----------
+AVATAR = HOME / '.face'
+PROFILE = STATE / 'profile.json'
+AVATAR_FOLDER = HOME / 'Pictures/Avatars'
+# Round, transparent copy for the UI: the bar renders in software, where QML can't mask.
+AVATAR_ROUND = Path(os.environ.get('XDG_CACHE_HOME') or HOME / '.cache') / 'victoria/face-round.png'
+
+
+def round_avatar():
+    if not AVATAR.is_file():
+        AVATAR_ROUND.unlink(missing_ok=True)
+        return None
+    if AVATAR_ROUND.is_file() and AVATAR_ROUND.stat().st_mtime >= AVATAR.stat().st_mtime:
+        return AVATAR_ROUND
+    if not shutil.which('magick'):
+        return None
+    AVATAR_ROUND.parent.mkdir(parents=True, exist_ok=True)
+    tmp = AVATAR_ROUND.with_suffix('.tmp.png')
+    # White disc as the opacity mask -> transparent corners.
+    command(['magick', str(AVATAR), '-resize', '256x256', '(', '+clone', '-threshold', '101%', '-fill', 'white',
+             '-draw', 'circle 127.5,127.5 127.5,0', ')', '-alpha', 'off', '-compose', 'CopyOpacity', '-composite',
+             str(tmp)], timeout=30)
+    os.replace(tmp, AVATAR_ROUND)
+    return AVATAR_ROUND
+
+
+def profile():
+    import pwd
+    data = json.loads(PROFILE.read_text()) if PROFILE.exists() else {}
+    user = os.environ.get('USER') or pwd.getpwuid(os.getuid()).pw_name
+    gecos = pwd.getpwuid(os.getuid()).pw_gecos.split(',')[0].strip()
+    AVATAR_FOLDER.mkdir(parents=True, exist_ok=True)
+    rounded = round_avatar()
+    return {'user': user, 'name': data.get('name') or gecos or user,
+            'avatar': str(AVATAR) if AVATAR.is_file() else None,
+            'round': str(rounded) if rounded else None, 'folder': str(AVATAR_FOLDER)}
+
+
+def set_profile_name(name):
+    name = ' '.join(str(name).split())[:40]
+    data = json.loads(PROFILE.read_text()) if PROFILE.exists() else {}
+    data['name'] = name
+    atomic(PROFILE, json.dumps(data) + '\n')
+    return profile()
+
+
+def set_avatar(path):
+    """Center-crop any image to a 512 px square at ~/.face (also used by display managers)."""
+    if path is None:
+        AVATAR.unlink(missing_ok=True)
+        icon = HOME / '.face.icon'
+        if icon.is_symlink() and os.readlink(icon) == '.face':
+            icon.unlink()
+        return profile()
+    source = Path(os.path.expanduser(str(path)))
+    if not source.is_file():
+        raise ValueError('That image no longer exists.')
+    if not shutil.which('magick'):
+        raise RuntimeError('ImageMagick (magick) is needed to crop the picture.')
+    fd, tmp = tempfile.mkstemp(prefix='.face-', suffix='.png', dir=HOME)
+    os.close(fd)
+    try:
+        command(['magick', str(source) + '[0]', '-auto-orient', '-resize', '512x512^', '-gravity', 'center',
+                 '-extent', '512x512', '-strip', tmp], timeout=30)
+        os.chmod(tmp, 0o644)
+        os.replace(tmp, AVATAR)
+    finally:
+        Path(tmp).unlink(missing_ok=True)
+    icon = HOME / '.face.icon'
+    if not icon.exists() and not icon.is_symlink():
+        icon.symlink_to('.face')
+    return profile()
+
+
+def choose_avatar():
+    """Open a file chooser (zenity) and apply the picked image; None if cancelled."""
+    if not shutil.which('zenity'):
+        raise RuntimeError('Install zenity to browse for any image, or use the Avatars folder.')
+    result = subprocess.run(['zenity', '--file-selection', '--title=Choose a profile picture',
+                             '--filename=' + str(HOME / 'Pictures') + '/',
+                             '--file-filter=Images | *.png *.jpg *.jpeg *.webp *.gif *.bmp'],
+                            capture_output=True, text=True)
+    chosen = result.stdout.strip()
+    return set_avatar(chosen) if result.returncode == 0 and chosen else None
+
+
+# ---------- Keyboard indicator ----------
+def keyboard_labels():
+    """Configured layouts with the description Mango reports (from evdev.lst) and a short code."""
+    found = {}
+    for p in (MANGO / 'config.conf', LOCAL / 'input.conf'):
+        if p.exists():
+            for key, value in re.findall(r'^\s*xkb_rules_(layout|variant)\s*=\s*(\S*)', p.read_text(), re.M):
+                found[key] = value
+    layouts = found.get('layout', 'us').split(',')
+    variants = (found.get('variant', '').split(',') + [''] * len(layouts))[:len(layouts)]
+    descriptions = {}
+    try:
+        section = None
+        for line in Path('/usr/share/X11/xkb/rules/evdev.lst').read_text().splitlines():
+            if line.startswith('!'):
+                section = line[1:].strip()
+                continue
+            match = re.match(r'\s+(\S+)\s+(.*)', line)
+            if not match:
+                continue
+            name, text = match.groups()
+            if section == 'layout':
+                descriptions[(name, '')] = text.strip()
+            elif section == 'variant' and ':' in text:
+                layout, text = text.split(':', 1)
+                descriptions[(layout.strip(), name)] = text.strip()
+    except OSError:
+        pass
+    result = []
+    for layout, variant in zip(layouts, variants):
+        code = layout.upper() + ('-' + variant.upper()[:4] if variant and variant != 'intl' else '')
+        if variant == 'intl':
+            code = layout.upper() + '·I'
+        result.append({'code': code, 'description': descriptions.get((layout, variant), layout)})
+    return result

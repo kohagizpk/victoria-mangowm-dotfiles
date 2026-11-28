@@ -18,7 +18,7 @@ def main():
         print(f'{"OK" if ok else "MISSING"}: {label}' + ('' if ok else f' — {hint}'))
         failures += not ok
 
-    for command in ('mango', 'waybar', 'wallust', 'fish', 'awww', 'waypaper', 'kitty', 'rofi', 'fuzzel', 'wlogout', 'cliphist', 'wl-copy', 'wl-paste', 'hyprlock', 'swayidle', 'nmcli', 'pactl'):
+    for command in ('mango', 'waybar', 'wallust', 'fish', 'awww', 'jq', 'magick', 'kitty', 'rofi', 'fuzzel', 'wlogout', 'cliphist', 'wl-copy', 'wl-paste', 'hyprlock', 'swayidle', 'nmcli', 'pactl'):
         check(shutil.which(command), command, f'Install {command} with your distribution package manager.')
     for name in ('config.conf', 'colors.conf', 'local/custom.conf', 'waybar/config.jsonc', 'waybar/colors.css',
                  'config/rofi/colors.rasi', 'config/fuzzel.ini'):

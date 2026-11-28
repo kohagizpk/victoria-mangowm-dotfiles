@@ -134,8 +134,8 @@
         "format": "⏻",
         "tooltip": false,
         "on-click": "wlogout",
-        "on-click-right": "systemctl poweroff",
-        "on-click-middle": "systemctl reboot"
+        "on-click-right": "loginctl poweroff",
+        "on-click-middle": "loginctl reboot"
     },
     "mpris": {
     "format": "{player_icon} {artist} - {title}",

@@ -107,11 +107,15 @@ PACKAGES=(
     # compositor
     mangowm-git
 
-    # bar, launcher, menu, clipboard
+    # desktop shell: bar, Control Center, Settings, launcher, clipboard,
+    # notifications, OSD and lock screen are Quickshell (config/quickshell);
+    # qt6-5compat is needed by the hyprquickpaper wallpaper picker.
+    quickshell qt6-5compat
+    # Waybar + rofi/fuzzel stay as the fallback bar (scripts/bar-switch.sh).
     # waybar-git, not waybar: the native mango/workspaces + mango/window
     # modules are recent additions upstream, the stable release may not have
     # them yet
-    quickshell waybar-git rofi fuzzel wmenu
+    waybar-git rofi fuzzel wmenu
     wl-clipboard cliphist wl-clip-persist
 
     # terminal, shell
@@ -120,9 +124,9 @@ PACKAGES=(
     # file manager & misc GUI utilities
     nemo pavucontrol nwg-look gtk4-layer-shell python-pillow
 
-    # wallpaper (awww, formerly swww, is the actual backend waypaper/wallust
-    # drive here — see scripts/wallust-reload.sh), multi-monitor
-    awww waypaper
+    # wallpaper: awww daemon + the vendored hyprquickpaper picker (jq and
+    # ImageMagick make its thumbnails); wallpapers live in ~/Pictures/Wallpapers
+    awww imagemagick jq
 
     # wallpaper-driven color scheme (wallust) + the two things it re-colors
     wallust cava python python-gobject gtk4
@@ -131,13 +135,13 @@ PACKAGES=(
     # Spotify theming (needs a one-time manual "spicetify backup apply"
     # after first login — see the summary at the end)
 
-    # screenshots
-    grim slurp
+    # screenshots, annotation, screen recording; zenity picks the profile picture
+    grim slurp swappy wf-recorder zenity
 
     # notifications, OSD, idle/lock, polkit
-    # dunst is kept only for the dunstify binary (used by volume.sh); the
-    # actual running notification daemon is swaync
-    dunst swaync libnotify
+    # Quickshell is the notification daemon, OSD and lock screen; swaync,
+    # swayosd and hyprlock are used with the Waybar fallback.
+    swaync libnotify
     swayosd brightnessctl pamixer
     hyprlock swaylock-effects swayidle
     xfce-polkit
@@ -327,10 +331,10 @@ if [[ "$DISTRO_FAMILY" == "fedora" ]]; then
         mangowm
         quickshell waybar rofi fuzzel foot kitty fish fastfetch
         nemo pavucontrol nwg-look gtk4-layer-shell python3-pillow
-        awww waypaper cava python3 python3-gobject gtk4
+        awww ImageMagick jq swappy wf-recorder zenity cava python3 python3-gobject gtk4
         NetworkManager bluez blueman pulseaudio-utils power-profiles-daemon hyprlock swaylock swayidle
         grim slurp
-        dunst swaync libnotify
+        swaync libnotify
         swayosd brightnessctl pamixer swayidle
         wlogout wlsunset
         xdg-desktop-portal xdg-desktop-portal-wlr xdg-desktop-portal-gtk
@@ -484,11 +488,11 @@ if [[ "$DISTRO_FAMILY" == "nixos" ]]; then
   environment.systemPackages = with pkgs; [
     quickshell waybar rofi fuzzel foot kitty fish fastfetch
     nemo pavucontrol nwg-look gtk4-layer-shell
-    awww waypaper
+    awww imagemagick jq swappy wf-recorder zenity
     wallust cava (python3.withPackages (ps: [ ps.pygobject3 ps.pillow ]))
     gtk4 gobject-introspection networkmanager bluez blueman pulseaudio power-profiles-daemon
     grim slurp
-    dunst swaync libnotify
+    swaync libnotify
     swayosd brightnessctl pamixer swayidle hyprlock swaylock-effects
     xfce-polkit wlogout wlsunset
     xdg-desktop-portal xdg-desktop-portal-wlr xdg-desktop-portal-gtk

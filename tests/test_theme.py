@@ -149,6 +149,13 @@ for template in config['templates'].values():
         self.run_theme('apply', '--install')
         self.assertFalse((self.home / 'unwanted-query').exists())
 
+    def test_wallpaper_folder_is_seeded_and_used_without_previous_choice(self):
+        self.run_theme('setup')
+        folder = self.home / 'Pictures/Wallpapers'
+        self.assertTrue(any(folder.iterdir()))
+        self.run_theme('apply', '--install')
+        self.assertEqual(Path((self.home / 'last-image').read_text()).parent, folder)
+
     def test_waypaper_xdg_state(self):
         image = self.home / 'state.jpg'; image.touch()
         path = self.home / '.config/waypaper/config.ini'; path.parent.mkdir()

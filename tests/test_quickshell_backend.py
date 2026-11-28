@@ -18,13 +18,11 @@ class SamplingTests(unittest.TestCase):
             self.assertEqual(backend.cached('pactl', 'get-default-sink', ttl=30), 'second')
             self.assertEqual(run.call_count, 2)
 
-    def test_audio_events_invalidate_only_audio_cache(self):
-        from unittest.mock import Mock
-        backend.command_cache.update({('pactl', 'list'): (0, 'old'), ('nmcli',): (0, 'network')})
-        events = backend.AudioEvents()
-        events.child = Mock()
-        events.child.poll.return_value = None
-        with patch.object(backend.select, 'select', side_effect=[([events.child.stdout], [], []), ([], [], [])]), patch.object(backend.os, 'read', return_value=b"Event 'change' on sink #1\n"):
-            events.poll()
-        self.assertNotIn(('pactl', 'list'), backend.command_cache)
-        self.assertIn(('nmcli',), backend.command_cache)
+    def test_sample_spawns_no_audio_or_notification_processes(self):
+        # Audio comes from Quickshell's PipeWire service and DND from a swaync/
+        # Quickshell subscription, so a sample may only run the cached network commands.
+        sampler = backend.Sampler()
+        with patch.object(backend, 'run', return_value='') as run:
+            data = sampler.sample()
+        self.assertTrue({'cpu', 'memory', 'temperature', 'network', 'battery', 'focus'} <= set(data))
+        self.assertFalse(any(call.args[0] in ('pactl', 'swaync-client', 'wpctl') for call in run.call_args_list))

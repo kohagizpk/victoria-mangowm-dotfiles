@@ -50,13 +50,10 @@ if [[ -d "$CONFIG_DIR/config/wlogout" ]]; then
     ok "~/.config/wlogout populated directly from the repo"
 fi
 
-# 4) autostart.sh: swayosd-server and the polkit agent don't start on their own
-#    without systemd --user; wire up a wallpaper fallback for waypaper's first run
+# 4) autostart.sh: the polkit agent doesn't start on its own without systemd --user.
+#    (swayosd-server/swaync are started by scripts/bar-launch.sh, only for Waybar:
+#    Quickshell draws its own OSD and serves notifications.)
 if [[ -f "$AUTOSTART" ]]; then
-    if ! grep -q "swayosd-server" "$AUTOSTART"; then
-        printf '\npgrep -x swayosd-server >/dev/null || swayosd-server &\n' >> "$AUTOSTART"
-        log_adapt "autostart.sh: added swayosd-server startup (used by volume.sh/brightness.sh but was never started)"
-    fi
 
     if ! grep -q "xfce-polkit" "$AUTOSTART"; then
         cat >> "$AUTOSTART" <<'POLKITEOF'
@@ -439,7 +436,7 @@ fi
 printf "\n${c_bold}${c_yellow}Worth double-checking by hand${c_reset}\n"
 info "monitor.conf: generated for detected hardware; customize ~/.config/mango/local/monitor.conf (preserved on updates)."
 info "The cursor theme name in config.conf (cursor_theme=) — see the warning above if that theme isn't installed"
-info "Pick a wallpaper with SUPER+F (waypaper) any time you want to change it — wallust will regenerate colors automatically from then on"
+info "Wallpapers live in ~/Pictures/Wallpapers — pick one with SUPER+F (hyprquickpaper) on the monitor you want; wallust recolors everything automatically"
 # info "Spicetify: autostart.sh runs 'spicetify backup apply' every login, but that needs one manual first-time setup after logging into Spotify — run 'spicetify backup apply' yourself once, following spicetify's own setup guide, before it'll do anything on autostart"
 echo
 printf "${c_bold}${c_blue}To start:${c_reset} log in on a TTY and run '%bmango%b', or pick Mango from ly's session list.\n" "$c_mauve" "$c_reset"
