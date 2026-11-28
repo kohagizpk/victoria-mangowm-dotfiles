@@ -165,6 +165,16 @@ sudo_write_to_append() {
     fi
 }
 # sed -i, wrapped the same way — announces the edit instead of making it.
+# In --dry-run every privileged command is only printed. "sudo tee FILE <<EOF"
+# blocks still get their heredoc drained so nothing waits on stdin.
+if [[ "$DRY_RUN" -eq 1 ]]; then
+    sudo() {
+        printf "  ${c_dim}would run:${c_reset} sudo %s\n" "$*"
+        [[ "${1:-}" == tee ]] && cat >/dev/null
+        return 0
+    }
+fi
+
 run_sed() {
     if [[ "$DRY_RUN" -eq 1 ]]; then
         printf "  ${c_dim}would edit:${c_reset} %s\n" "${*: -1}"
@@ -490,7 +500,11 @@ PACKAGES=(
     # compositor
     mangowm-git
 
-    # bar, launcher, menu, clipboard
+    # desktop shell: bar, Control Center, Settings, launcher, clipboard,
+    # notifications, OSD and lock screen are all Quickshell (quickshell/).
+    # qt6-5compat is needed by the hyprquickpaper wallpaper picker.
+    quickshell qt6-5compat
+    # Waybar + rofi/fuzzel stay as the fallback bar (scripts/bar-switch.sh).
     # waybar-git, not waybar: the native mango/workspaces + mango/window
     # modules are recent additions upstream, the stable release may not have
     # them yet
@@ -503,9 +517,9 @@ PACKAGES=(
     # file manager & misc GUI utilities
     nemo pavucontrol nwg-look
 
-    # wallpaper (awww, formerly swww, is the actual backend waypaper/wallust
-    # drive here — see scripts/wallust-reload.sh), multi-monitor
-    awww waypaper
+    # wallpaper: awww daemon + the vendored hyprquickpaper picker (needs jq and
+    # ImageMagick for thumbnails); wallpapers live in ~/Pictures/Wallpapers
+    awww imagemagick
 
     # wallpaper-driven color scheme (wallust) + the two things it re-colors
     wallust cava
@@ -514,16 +528,18 @@ PACKAGES=(
     # after first login — see the summary at the end)
     spicetify-cli
 
-    # screenshots
-    grim slurp
+    # screenshots, annotation, screen recording
+    grim slurp swappy wf-recorder
 
     # notifications, OSD, idle/lock, polkit
-    # dunst is kept only for the dunstify binary (used by volume.sh); the
-    # actual running notification daemon is swaync
-    dunst swaync libnotify
+    # Quickshell is the notification daemon, OSD and lock screen; swaync,
+    # swayosd and hyprlock are only used with the Waybar fallback.
+    swaync libnotify
     swayosd brightnessctl pamixer
-    swaylock-effects swayidle
+    hyprlock swayidle
     xfce-polkit
+    # file chooser for the profile picture, power profiles in the Control Center
+    zenity power-profiles-daemon
 
     # session / logout, blue light filter
     wlogout wlsunset
@@ -557,8 +573,8 @@ PACKAGES=(
 # ly is the display manager on every init system; each one needs its own
 # integration package.
 case "$INIT_SYSTEM" in
-    openrc)  PACKAGES+=(elogind-openrc ly ly-openrc) ;;
-    dinit)   PACKAGES+=(elogind-dinit ly ly-dinit) ;;
+    openrc)  PACKAGES+=(elogind-openrc ly ly-openrc power-profiles-daemon-openrc) ;;
+    dinit)   PACKAGES+=(elogind-dinit ly ly-dinit power-profiles-daemon-dinit) ;;
     systemd) PACKAGES+=(ly) ;;
 esac
 
@@ -705,10 +721,10 @@ if [[ "$DISTRO_FAMILY" == "fedora" ]]; then
         mangowm
         waybar rofi fuzzel foot kitty fish fastfetch
         nemo pavucontrol nwg-look
-        awww waypaper cava
+        awww cava ImageMagick jq zenity swappy wf-recorder power-profiles-daemon
         grim slurp
-        dunst swaync libnotify
-        swayosd brightnessctl pamixer swayidle
+        swaync libnotify
+        swayosd brightnessctl pamixer swayidle hyprlock
         wlogout wlsunset
         xdg-desktop-portal xdg-desktop-portal-wlr xdg-desktop-portal-gtk
         xorg-x11-server-Xwayland
@@ -859,11 +875,11 @@ if [[ "$DISTRO_FAMILY" == "nixos" ]]; then
   environment.systemPackages = with pkgs; [
     waybar rofi fuzzel foot kitty fish fastfetch
     nemo pavucontrol nwg-look
-    awww waypaper
+    quickshell awww imagemagick jq zenity swappy wf-recorder
     wallust cava
     grim slurp
-    dunst swaync libnotify
-    swayosd brightnessctl pamixer swayidle swaylock-effects
+    swaync libnotify
+    swayosd brightnessctl pamixer swayidle hyprlock
     xfce-polkit wlogout wlsunset
     xdg-desktop-portal xdg-desktop-portal-wlr xdg-desktop-portal-gtk
     xwayland
@@ -913,7 +929,6 @@ step "Applying corrections"
 WAYBAR_JSONC="$CONFIG_DIR/waybar/config.jsonc"
 AUTOSTART="$CONFIG_DIR/autostart.sh"
 WLOGOUT_LAYOUT="$CONFIG_DIR/config/wlogout/layout"
-WLOGOUT_THEME_SCRIPT="$CONFIG_DIR/scripts/wlogout-theme.sh"
 
 # 1) waybar: systemctl -> loginctl (no systemd, running elogind)
 if [[ -f "$WAYBAR_JSONC" ]]; then
@@ -931,12 +946,10 @@ if [[ -d "$CONFIG_DIR/config/wlogout" ]]; then
 fi
 
 # 4) autostart.sh: swayosd-server and the polkit agent don't start on their own
-#    without systemd --user; wire up a wallpaper fallback for waypaper's first run
+#    without systemd --user
 if [[ -f "$AUTOSTART" ]]; then
-    if ! grep -q "swayosd-server" "$AUTOSTART"; then
-        printf '\npgrep -x swayosd-server >/dev/null || swayosd-server &\n' >> "$AUTOSTART"
-        log_adapt "autostart.sh: added swayosd-server startup (used by volume.sh/brightness.sh but was never started)"
-    fi
+    # (swayosd-server/swaync are started by scripts/bar-launch.sh, only for Waybar:
+    #  Quickshell draws its own OSD and serves notifications.)
 
     if ! grep -q "xfce-polkit" "$AUTOSTART"; then
         cat >> "$AUTOSTART" <<'POLKITEOF'
@@ -952,17 +965,10 @@ POLKITEOF
     fi
 
     WALLPAPER_FALLBACK="$(find "$CONFIG_DIR/config" "$CONFIG_DIR/wallpaper" -maxdepth 2 \( -iname 'wallpaper*.png' -o -iname 'wallpaper*.jpg' \) 2>/dev/null | head -1)"
-    if grep -qx 'waypaper --restore &' "$AUTOSTART" && ! grep -q 'awww img' "$AUTOSTART" && [[ -n "$WALLPAPER_FALLBACK" ]]; then
-        run_sed -i '/^waypaper --restore &$/c\
-if [ -f "$HOME/.config/waypaper/config.ini" ]; then\
-    waypaper --restore \&\
-else\
-    awww img "'"${WALLPAPER_FALLBACK}"'" \&\
-fi' "$AUTOSTART"
-        log_adapt "autostart.sh: waypaper --restore does nothing on a fresh install (no saved state yet) -> falls back to 'awww img' with a bundled wallpaper so you get one immediately (swaybg isn't the backend here anymore, awww is)"
-    elif [[ -z "$WALLPAPER_FALLBACK" ]]; then
-        info "No wallpaper image bundled in the repo right now, so no fallback was set up — the desktop will have no wallpaper until you pick one with SUPER+F (waypaper)."
-    fi
+    # The first login restores the last wallpaper, or the first image in
+    # ~/Pictures/Wallpapers (scripts/wallpaper-start.sh + theme.py), so no
+    # autostart fallback is needed here anymore.
+    [[ -n "$WALLPAPER_FALLBACK" ]] || info "No wallpaper image bundled in the repo right now — the desktop will have no wallpaper until you add one to ~/Pictures/Wallpapers and pick it with SUPER+F."
 
     if [[ "$INIT_SYSTEM" == "systemd" ]]; then
         run_sed -i 's/^dbus-update-activation-environment \\$/dbus-update-activation-environment --systemd \\/' "$AUTOSTART"
@@ -1017,29 +1023,19 @@ if [[ -f "$WALLUST_TOML_SRC" ]]; then
     [[ -f "$WALLUST_TEMPLATE_SRC" ]] && cp "$WALLUST_TEMPLATE_SRC" "$HOME/.config/wallust/templates/mango-colors.conf"
     ok "~/.config/wallust/wallust.toml deployed"
 
-    # Wire wallust-reload.sh into waypaper so a wallpaper change regenerates
-    # colors.css/colors.conf automatically, instead of leaving the repo's
-    # bundled fallback palette in place forever.
-    mkdir -p "$HOME/.config/waypaper"
-    WAYPAPER_INI="$HOME/.config/waypaper/config.ini"
-    POST_CMD="$CONFIG_DIR/scripts/wallust-reload.sh"
-    if [[ ! -f "$WAYPAPER_INI" ]]; then
-        printf '[Settings]\npost_command = %s\n' "$POST_CMD" | write_to "$WAYPAPER_INI"
-        log_adapt "Created ~/.config/waypaper/config.ini with post_command pointing at scripts/wallust-reload.sh, so picking a new wallpaper regenerates the mango/waybar colors automatically"
-    elif ! grep -q '^post_command' "$WAYPAPER_INI"; then
-        run_sed -i "/^\[Settings\]/a post_command = ${POST_CMD}" "$WAYPAPER_INI"
-        log_adapt "Added post_command to the existing ~/.config/waypaper/config.ini, pointing at scripts/wallust-reload.sh"
+    # Victoria setup: wallust templates, ~/Pictures/Wallpapers (seeded with the
+    # bundled wallpapers), notification/fish configs and desktop launchers.
+    # Wallpapers are picked with hyprquickpaper (SUPER+F), whose post_apply hook
+    # runs scripts/wallust-reload.sh.
+    if [[ "$DRY_RUN" -eq 1 ]]; then
+        printf "  ${c_dim}would run:${c_reset} python3 %s setup && python3 %s apply --install\n" "$CONFIG_DIR/scripts/theme.py" "$CONFIG_DIR/scripts/theme.py"
     else
-        info "~/.config/waypaper/config.ini already has a post_command set — left it alone, checking it still points at scripts/wallust-reload.sh is on you if you changed it."
-    fi
-
-    # Generate real colors for whatever wallpaper actually ends up in use,
-    # instead of relying on the bundled fallback palette (a dark red) forever.
-    if command -v wallust >/dev/null 2>&1 && [[ -n "${WALLPAPER_FALLBACK:-}" ]]; then
-        if [[ "$DRY_RUN" -eq 1 ]]; then
-            printf "  ${c_dim}would run:${c_reset} wallust run %s\n" "$WALLPAPER_FALLBACK"
+        if python3 "$CONFIG_DIR/scripts/theme.py" setup >/dev/null; then
+            log_adapt "Victoria theme set up: wallust templates, ~/Pictures/Wallpapers, notifications and launchers"
+            python3 "$CONFIG_DIR/scripts/theme.py" apply --install >/dev/null \
+                || warn "Generating colors failed — open Victoria Settings → Health → Refresh colors after logging in."
         else
-            wallust run "$WALLPAPER_FALLBACK" >/dev/null 2>&1 || warn "wallust run failed — the bundled fallback colors are still in place, run it by hand later."
+            warn "scripts/theme.py setup failed — run it again after logging in: python3 ~/.config/mango/scripts/theme.py setup"
         fi
     fi
 else
@@ -1237,14 +1233,14 @@ elif [[ -d "$ULTRAGRUB_DIR" ]]; then
 
         grub_install_ok=1
         info "Running the theme's install.sh (downloads UltraGrub from GitHub, --lang English)..."
-        if ! bash "$ULTRAGRUB_DIR/install.sh" --lang English; then
+        if ! run bash "$ULTRAGRUB_DIR/install.sh" --lang English; then
             err "The theme's install.sh failed (see the output above). Skipping patch_entries.sh."
             grub_install_ok=0
         fi
 
         if [[ "$grub_install_ok" -eq 1 ]]; then
             info "Running patch_entries.sh..."
-            if bash "$ULTRAGRUB_DIR/patch_entries.sh"; then
+            if run bash "$ULTRAGRUB_DIR/patch_entries.sh"; then
                 ok "GRUB boot entries patched"
                 log_adapt "GRUB: installed the UltraGrub theme and applied patch_entries.sh (backup at $GRUB_BACKUP)"
             else
@@ -1275,7 +1271,7 @@ FISH_BIN="$(command -v fish || true)"
 if [[ -n "$FISH_BIN" && "$SHELL" != "$FISH_BIN" ]]; then
     if confirm "Set fish as your default shell?"; then
         grep -qxF "$FISH_BIN" /etc/shells || echo "$FISH_BIN" | sudo tee -a /etc/shells >/dev/null
-        chsh -s "$FISH_BIN"
+        run chsh -s "$FISH_BIN"
         ok "Shell changed (takes effect on your next login)"
     fi
 else
@@ -1334,7 +1330,7 @@ fi
 printf "\n${c_bold}${c_yellow}Worth double-checking by hand${c_reset}\n"
 info "monitor.conf: shipped with DP-1 @165Hz + HDMI-A-1 — edit the output names/modes there for your own monitors (wlr-randr lists them)"
 info "The cursor theme name in config.conf (cursor_theme=) — see the warning above if that theme isn't installed"
-info "Pick a wallpaper with SUPER+F (waypaper) any time you want to change it — wallust will regenerate colors automatically from then on"
+info "Wallpapers live in ~/Pictures/Wallpapers — pick one with SUPER+F (hyprquickpaper), on the monitor you want; wallust recolors everything automatically"
 info "Spicetify: autostart.sh runs 'spicetify backup apply' every login, but that needs one manual first-time setup after logging into Spotify — run 'spicetify backup apply' yourself once, following spicetify's own setup guide, before it'll do anything on autostart"
 echo
 printf "${c_bold}${c_blue}To start:${c_reset} log in on a TTY and run '%bmango%b', or pick Mango from ly's session list.\n" "$c_mauve" "$c_reset"

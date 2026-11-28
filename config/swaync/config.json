@@ -1,0 +1,93 @@
+{
+  "$schema": "/etc/xdg/swaync/configSchema.json",
+  "ignore-gtk-theme": true,
+  "positionX": "right",
+  "positionY": "top",
+  "layer": "overlay",
+  "control-center-layer": "top",
+  "layer-shell": true,
+  "layer-shell-cover-screen": true,
+  "cssPriority": "user",
+  "control-center-margin-top": 12,
+  "control-center-margin-bottom": 12,
+  "control-center-margin-right": 12,
+  "control-center-margin-left": 0,
+  "notification-2fa-action": true,
+  "notification-inline-replies": false,
+  "notification-body-image-height": 100,
+  "notification-body-image-width": 200,
+  "timeout": 8,
+  "timeout-low": 5,
+  "timeout-critical": 0,
+  "fit-to-screen": true,
+  "relative-timestamps": true,
+  "control-center-width": 420,
+  "control-center-height": 740,
+  "notification-window-width": 400,
+  "keyboard-shortcuts": true,
+  "notification-grouping": true,
+  "image-visibility": "when-available",
+  "transition-time": 200,
+  "hide-on-clear": false,
+  "hide-on-action": true,
+  "text-empty": "All caught up",
+  "script-fail-notify": true,
+  "widgets": [
+    "title#calendar",
+    "label#calendar",
+    "buttons-grid#calendar",
+    "title",
+    "dnd",
+    "buttons-grid#performance",
+    "notifications"
+  ],
+  "widget-config": {
+    "title#calendar": {
+      "text": "Calendar",
+      "clear-all-button": false
+    },
+    "label#calendar": {
+      "text": "",
+      "max-lines": 8
+    },
+    "buttons-grid#calendar": {
+      "buttons-per-row": 3,
+      "actions": [
+        {
+          "label": "‹ Previous",
+          "command": "python3 \"$HOME/.config/mango/scripts/notification-calendar.py\" previous"
+        },
+        {
+          "label": "Today",
+          "command": "python3 \"$HOME/.config/mango/scripts/notification-calendar.py\" today"
+        },
+        {
+          "label": "Next ›",
+          "command": "python3 \"$HOME/.config/mango/scripts/notification-calendar.py\" next"
+        }
+      ]
+    },
+    "title": {
+      "text": "Notifications",
+      "clear-all-button": true,
+      "button-text": "Clear"
+    },
+    "dnd": {
+      "text": "Do not disturb"
+    },
+    "notifications": {
+      "vexpand": true
+    },
+    "buttons-grid#performance": {
+      "buttons-per-row": 1,
+      "actions": [
+        {
+          "label": "Visual performance",
+          "type": "toggle",
+          "command": "python3 \"$HOME/.config/mango/scripts/session-controls.py\" performance-set",
+          "update-command": "python3 \"$HOME/.config/mango/scripts/session-controls.py\" performance-status"
+        }
+      ]
+    }
+  }
+}

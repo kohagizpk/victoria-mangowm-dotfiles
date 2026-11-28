@@ -1,0 +1,11 @@
+# Python bytecode
+__pycache__/
+*.pyc
+
+# Per-machine state: settings, monitors and overrides written by Victoria Settings
+local/
+
+# Editor and OS clutter
+*.swp
+*~
+.DS_Store

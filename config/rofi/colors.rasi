@@ -1,0 +1,47 @@
+/* Palette for the JaKooLit / adi1090x theme. */
+* {
+active-background: #893F3F;
+active-foreground: #D2CECD;
+normal-background: #0B0808;
+normal-foreground: #D2CECD;
+urgent-background: #B9413E;
+urgent-foreground: #D2CECD;
+
+alternate-active-background: #574040;
+alternate-active-foreground: #D2CECD;
+alternate-normal-background: #0B0808;
+alternate-normal-foreground: #D2CECD;
+alternate-urgent-background: #0B0808;
+alternate-urgent-foreground: #D2CECD;
+
+selected-active-background: #B9413E;
+selected-active-foreground: #D2CECD;
+selected-normal-background: #B9413E;
+selected-normal-foreground: #D2CECD;
+selected-urgent-background: #893F3F;
+selected-urgent-foreground: #D2CECD;
+
+background-color: #0B0808;
+background: rgba(0,0,0,0.7);
+foreground: #D2CECD;
+border-color: #893F3F;
+
+color0: #0D0A0A;
+color1: #574040;
+color2: #673F3F;
+color3: #615E5E;
+color4: #893F3F;
+color5: #B9413E;
+color6: #7F7D7D;
+color7: #D2CECD;
+color8: #232121;
+color9: #574040;
+color10: #673F3F;
+color11: #615E5E;
+color12: #893F3F;
+color13: #B9413E;
+color14: #7F7D7D;
+color15: #D2CECD;
+
+
+}

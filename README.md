@@ -1,21 +1,26 @@
 # Victoria's MangoWM Dotfiles
 
-Personal dotfiles for a [mango](https://github.com/mangowm/mango) (dwl-based Wayland compositor) desktop — Waybar, a full Wayland utility stack, GRUB theming, and an installer that adapts itself to your distro, your init system, and your hardware.
+Personal dotfiles for a [mango](https://github.com/mangowm/mango) (dwl-based Wayland compositor) desktop — a [Quickshell](https://quickshell.org) shell themed by your wallpaper, a full Wayland utility stack, GRUB theming, and an installer that adapts itself to your distro, your init system, and your hardware.
 
 https://github.com/user-attachments/assets/cb902017-0d69-4222-970d-5467773197c4
 
 ## Features
 
 - **Window manager:** [mango](https://github.com/mangowm/mango) — a dwl-based Wayland compositor
-- **Status bar:** Waybar, with a CPU temperature sensor auto-detected on install, a live tags module read straight from mango's own IPC, MPRIS media controls, and a calendar popup
-- **App launcher:** rofi, plus fuzzel for the clipboard picker
+- **Shell (Quickshell, `quickshell/`):** everything below follows the wallust palette and runs in one process (software renderer, ~110 MB)
+  - **Bar:** tags, mic/volume (live from PipeWire), stats, keyboard layout (with 2+ layouts), weather (opt-in), now playing + cava, recording timer, notifications, clock
+  - **Control Center** (SUPER+C): Wi-Fi and Bluetooth lists, Do-not-disturb, night light (always or scheduled), keep awake, performance mode, power profile, focus mode, notification history, sound, media, capture (region/window/screen/annotate/record) and session actions
+  - **Victoria Settings** (SUPER+,): profile picture, appearance with live preview, bar, notifications, keyboard & mouse, lock & idle, setup (35 keyboard layouts + a second layout to switch to), searchable shortcuts, desktop health
+  - **App launcher** (SUPER+D) with fuzzy search, most-used first and a calculator (`12*4` → Enter copies 48)
+  - **Clipboard history** (SUPER+V) over cliphist, with image thumbnails
+  - **Notifications** (popups + history, actions, critical alerts pass through DND), **volume/brightness/layout OSD**, **lock screen** (PAM, avatar, media controls)
+  - Waybar + rofi + swaync + swayosd + hyprlock remain as the fallback: `scripts/bar-switch.sh waybar`
 - **Clipboard manager:** cliphist
-- **Notifications & OSD:** swaync for notifications, swayosd for on-screen volume/brightness feedback
-- **Screenshots:** grim + slurp
+- **Screenshots & recording:** grim + slurp (`scripts/screenshot.sh region|window|screen [--edit]`, saved to `~/Pictures/Screenshots` and copied), swappy for annotation, wf-recorder (`scripts/record.sh`, saved to `~/Videos/Recordings`)
 - **Logout menu:** wlogout, themed
-- **Wallpaper:** waypaper (SUPER+F), with a bundled fallback wallpaper for the first boot
+- **Wallpaper:** per monitor (the picker applies to the monitor it opened on), optional automatic rotation in Settings → Appearance; [hyprquickpaper](https://github.com/ujjalsigdel/hyprquickpaper) (SUPER+F), a Quickshell picker vendored in `hyprquickpaper/` and set up for awww. **Your wallpapers live in `~/Pictures/Wallpapers`**: drop images there and they appear in the picker (the bundled ones are copied there on first setup)
 - **Multi-monitor:** native `monitor_rule=` lines in `monitor.conf` (mango doesn't implement `wlr-output-management`, so kanshi/wlr-randr can't be used). The file ships with the author's monitors (DP-1 @165 Hz + HDMI-A-1) — edit the output names/modes for your own setup
-- **Wallpaper-driven colors:** wallust regenerates `colors.conf` (mango borders) and `waybar/colors.css` every time waypaper changes the wallpaper; mango hot-reloads on its own (`auto_reload_config`)
+- **Wallpaper-driven colors:** wallust regenerates `colors.conf` (mango borders) and `waybar/colors.css` every time you pick a wallpaper (hyprquickpaper's `post_apply` hook runs `scripts/wallust-reload.sh`); mango hot-reloads on its own (`auto_reload_config`)
 - **Keyboard layout:** picked from a short menu during install and applied both to mango (`xkb_rules_layout`/`xkb_rules_variant`) and to the raw console (`/etc/vconsole.conf`), so it's consistent whether you're at a bare TTY or inside the graphical session
 - **GTK theming:** Materia-dark applied the same way `nwg-look` would (gtk-3.0/gtk-4.0 `settings.ini`, `~/.gtkrc-2.0`, `GTK_THEME` env var)
 - **Shell:** fish, with the greeting disabled and fastfetch shown on every new terminal
@@ -23,6 +28,7 @@ https://github.com/user-attachments/assets/cb902017-0d69-4222-970d-5467773197c4
 - **Cursor theme:** whatever `cursor_theme=` says in `config.conf` (currently `Samuel-Noticias-Cursor`). If a folder with that name exists in `config/`, the installer copies it to `~/.local/share/icons`; otherwise it only checks that the theme is installed
 - **Bootloader theming (optional):** UltraGrub GRUB theme, plus a patch that cleans up boot entries (e.g. tidies the Windows entry for dual-boot)
 - **Display manager (optional):** [ly](https://github.com/fairyglade/ly), set up so Mango is the only session in the list
+- **Profile picture:** Victoria Settings → Profile. Pick from `~/Pictures/Avatars`, your Pictures or wallpapers, or any file (zenity). It is saved as `~/.face` and shown in the Control Center and on the lock screen
 - **Discord screen sharing** wired up correctly (`--ozone-platform=wayland` + PipeWire capturer) wherever Discord gets launched from
 
 ### The installer
@@ -46,17 +52,21 @@ mango -c ~/.config/mango/config.conf -p
 
 | Keybind            | Action                                 |
 | ------------------- | --------------------------------------- |
-| SUPER + D           | App launcher (rofi)                    |
+| SUPER + D           | App launcher                           |
 | SUPER + 1...9       | Change tag/workspace                   |
 | ALT + 1...9         | Move program to tag/workspace          |
-| SUPER + V           | Clipboard history (cliphist + fuzzel)  |
-| SUPER + Shift + S   | Screenshot                             |
+| SUPER + V           | Clipboard history                      |
+| SUPER + Shift + S   | Screenshot of a region                 |
+| SUPER + C           | Control Center                         |
+| SUPER + ,           | Victoria Settings                      |
+| SUPER + /           | Shortcut guide                         |
+| SUPER + L           | Lock screen                            |
 | SUPER + Enter       | Terminal (kitty)                       |
 | SUPER + E           | File manager (nemo)                    |
 | SUPER + W           | Browser (Helium)                       |
 | SUPER + A           | Discord                                |
 | SUPER + S           | Spotify                                |
-| SUPER + F           | Wallpaper selector (waypaper)          |
+| SUPER + F           | Wallpaper picker (hyprquickpaper)      |
 | SUPER + Q           | Close active window                    |
 | ALT + F             | Toggle fullscreen                      |
 | ALT + M             | Quit window manager                    |
@@ -104,8 +114,10 @@ The script is interactive: it walks you through a few quick choices up front (ke
 .
 ├── assets/        # Media used in this README
 ├── config/        # Terminal config, cursor theme, rofi/fuzzel theme, wlogout, wallust, GRUB theme
-├── scripts/       # Helper scripts (volume/brightness OSD, print, waybar launcher, wallust hook, calendar, cava)
-├── wallpaper/     # Bundled wallpapers
+├── quickshell/    # The desktop shell: bar, Control Center, Settings, launcher, clipboard, notifications, OSD, lock
+├── scripts/       # Settings backend (victoria_settings.py + victoria-cli.py), theme/wallust, session (lock/idle/performance), screenshots, recording, launchers
+├── wallpaper/     # Bundled wallpapers (copied to ~/Pictures/Wallpapers)
+├── hyprquickpaper/ # Vendored wallpaper picker (MIT), see hyprquickpaper/VICTORIA.md
 ├── waybar/        # Waybar config, stylesheet and wallust color files
 ├── config.conf    # Main mango config (visuals, animations, input) — sources the files below
 ├── env.conf       # Environment variables
@@ -115,8 +127,29 @@ The script is interactive: it walks you through a few quick choices up front (ke
 ├── tag.conf       # Per-tag layouts
 ├── colors.conf    # Generated by wallust (fallback palette until its first run)
 ├── autostart.sh   # Everything started with the session
+├── local/         # Your per-machine settings (git-ignored): settings.json, monitors, input, overrides
 └── install.sh     # Automated installer
 ```
+
+## Lock screen
+
+SUPER+L (and idle/suspend) lock with the Quickshell lock screen, which checks your password through PAM (`/etc/pam.d/login`, the same stack hyprlock uses). If the shell ever crashes while locked, Mango keeps the session locked. Switch to a TTY (Ctrl+Alt+F3), log in and run:
+
+```bash
+WAYLAND_DISPLAY=wayland-0 XDG_RUNTIME_DIR=/run/user/$(id -u) quickshell ipc -p ~/.config/mango/quickshell call bar unlock
+```
+
+or, if the shell is gone, start it again (`bash ~/.config/mango/scripts/bar-launch.sh` with the same variables) and unlock normally.
+
+## Scripting the shell
+
+Everything in the Control Center is reachable from scripts and keybinds:
+
+```bash
+quickshell ipc -p ~/.config/mango/quickshell call bar <function> [args]
+```
+
+`controlCenter`, `launcher`, `clipboard`, `settings <page>`, `lock`, `volume <mic> <delta>`, `mute <mic>`, `dnd <on>`, `nightLight <on>`, `caffeine <on>`, `set <key> <json>` / `get <key>`, `quick` (current state as JSON).
 
 ## Known issues
 
